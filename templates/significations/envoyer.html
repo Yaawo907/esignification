@@ -1,0 +1,75 @@
+{% extends 'base/base.html' %}
+{% block title %}Envoyer une signification{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="auth-container" style="max-width:640px;">
+  <div class="auth-card">
+    <h2 class="auth-title">Envoyer une signification</h2>
+    {% if justiciable %}
+    <div class="info-box" style="margin-bottom:16px;">Justiciable sélectionné : <strong>{{ justiciable.nom_complet }}</strong> — {{ justiciable.email_domicile }}</div>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      {% if justiciable %}<input type="hidden" name="justiciable_uuid" value="{{ justiciable.uuid }}">{% endif %}
+      <div class="form-group">
+        <label class="form-label">Justiciable destinataire</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="search-just" class="form-input" placeholder="Rechercher par NPI, IFU, email…" autocomplete="off">
+          <input type="hidden" name="justiciable_uuid" id="just-uuid" value="{{ justiciable.uuid|default:'' }}">
+        </div>
+        <div id="search-results" class="search-dropdown" style="display:none;"></div>
+        {% if justiciable %}<p class="form-hint" style="color:#0d6e4f;">✓ {{ justiciable.nom_complet }} — {{ justiciable.email_domicile }}</p>{% endif %}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Acte à signifier (PDF signé) *</label>
+        <input type="file" name="fichier_acte" class="form-input" accept=".pdf" required>
+        <p class="form-hint">Le fichier doit être un PDF signé électroniquement avec YouSign avant upload.</p>
+      </div>
+      <div class="form-group form-check">
+        <input type="checkbox" name="necessite_reponse" id="necessite_reponse">
+        <label for="necessite_reponse">Cet acte nécessite une réponse du justiciable</label>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <a href="{% url 'huissiers:tableau_de_bord' %}" class="btn btn-ghost">Annuler</a>
+        <button type="submit" class="btn btn-primary btn-spinner" data-loading="Envoi en cours…">
+          <span class="btn-text">✉ Envoyer la signification</span>
+          <span class="btn-loader" style="display:none;"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const searchInput = document.getElementById('search-just');
+const resultsDiv = document.getElementById('search-results');
+const uuidField = document.getElementById('just-uuid');
+let timeout;
+if (searchInput) {
+  searchInput.addEventListener('input', function() {
+    clearTimeout(timeout);
+    const q = this.value.trim();
+    if (q.length < 2) { resultsDiv.style.display = 'none'; return; }
+    timeout = setTimeout(() => {
+      fetch('/api/justiciables/rechercher/?q=' + encodeURIComponent(q), {headers: {'X-CSRFToken': getCookie('csrftoken')}})
+        .then(r => r.json())
+        .then(d => {
+          if (!d.resultats.length) { resultsDiv.style.display = 'none'; return; }
+          resultsDiv.innerHTML = d.resultats.map(j =>
+            '<div class="search-item" onclick="selectJust('' + j.uuid + '','' + j.nom.replace(/'/g,"\'") + '','' + j.email + '')">' +
+            '<strong>' + j.nom + '</strong> — ' + j.email + ' | NPI: ' + (j.npi||'-') + ' IFU: ' + (j.ifu||'-') +
+            '</div>').join('');
+          resultsDiv.style.display = 'block';
+        });
+    }, 300);
+  });
+}
+function selectJust(uuid, nom, email) {
+  uuidField.value = uuid;
+  searchInput.value = nom + ' — ' + email;
+  resultsDiv.style.display = 'none';
+}
+function getCookie(n) { let v = null; document.cookie.split(';').forEach(c => { if (c.trim().startsWith(n+'=')) v = decodeURIComponent(c.trim().slice(n.length+1)); }); return v; }
+</script>
+{% endblock %}

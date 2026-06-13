@@ -1,0 +1,60 @@
+{% extends 'base/base.html' %}
+{% block title %}Créer mon compte — e-Signification{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-container" style="max-width:600px;">
+  <div class="auth-card">
+    <h2 class="auth-title">Créer mon compte justiciable</h2>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="form-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="form-group">
+        <label class="form-label">Type de compte</label>
+        <div class="radio-group">{{ form.type_compte }}</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nom / Raison sociale *</label>{{ form.nom }}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prénom</label>{{ form.prenom }}
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Numéro IFU</label>{{ form.ifu }}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Numéro NPI</label>{{ form.npi }}
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adresse *</label>{{ form.adresse }}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Téléphone *</label>{{ form.telephone }}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email d'élection de domicile électronique *</label>
+        {{ form.email_domicile }}
+        <p class="form-hint">C'est à cette adresse que vous recevrez toutes vos significations.</p>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Mot de passe *</label>{{ form.mot_de_passe }}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmer *</label>{{ form.confirmer_mdp }}
+        </div>
+      </div>
+      <div class="form-group form-check">
+        {{ form.accepter_cgu }} <label>J'accepte les <a href="/cgu/" target="_blank">CGU</a></label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="Création…">
+        <span class="btn-text">Créer mon compte</span>
+        <span class="btn-loader" style="display:none;"><svg class="spin-icon" viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></path></svg></span>
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

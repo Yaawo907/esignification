@@ -1,0 +1,50 @@
+{% extends 'base/base.html' %}
+{% block title %}Créer un huissier{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-admin">
+    <div class="sidebar-logo"><div class="logo-box-sm"></div><div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div>
+    <nav class="sidebar-nav">
+      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a>
+      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white active">✎ Huissiers</a>
+      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a>
+      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
+      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
+    </nav>
+    <div class="sidebar-user sidebar-user-dark"><div class="user-avatar">A</div><div><div class="user-name" style="color:#fff;">Administrateur</div></div><a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a></div>
+  </aside>
+  <main class="dashboard-main">
+    <header class="topbar"><div><h1 class="topbar-title">Créer un compte huissier</h1><p class="topbar-sub">L'huissier recevra un lien d'activation par email.</p></div></header>
+    <div class="content-area">
+      <div class="form-card" style="max-width:560px;">
+        <div class="form-card-body">
+          <div class="flow-steps">
+            <div class="flow-step"><div class="flow-dot flow-dot-done">1</div><div class="flow-label"><strong>Vous</strong><br>Saisir l'email</div></div>
+            <div class="flow-step"><div class="flow-dot">2</div><div class="flow-label"><strong>Huissier</strong><br>Reçoit le lien</div></div>
+            <div class="flow-step"><div class="flow-dot">3</div><div class="flow-label"><strong>Huissier</strong><br>Complète le profil</div></div>
+            <div class="flow-step"><div class="flow-dot">4</div><div class="flow-label"><strong>Compte</strong><br>Activé</div></div>
+          </div>
+          {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags }}">{{ m }}</div>{% endfor %}{% endif %}
+          <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="form-group">
+              <label class="form-label">Mail officiel de l'huissier <span class="required">*</span></label>
+              <input type="email" name="email" class="form-input" placeholder="exemple@etude-huissier.bj" required autofocus>
+              <p class="form-hint">L'huissier complétera lui-même : nom, prénom, étude, IFU, NPI, adresse, téléphone et mot de passe.</p>
+            </div>
+            <div class="warn-box">⚠ Le lien d'activation sera valable <strong>72 heures</strong>. Vérifiez l'adresse avant d'envoyer.</div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+              <a href="{% url 'administration:liste_huissiers' %}" class="btn btn-ghost">Annuler</a>
+              <button type="submit" class="btn btn-primary btn-spinner" data-loading="Envoi…">
+                <span class="btn-text">✉ Envoyer le lien d'activation</span>
+                <span class="btn-loader" style="display:none;"></span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

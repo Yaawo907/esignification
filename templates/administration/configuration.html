@@ -1,0 +1,117 @@
+{% extends 'base/base.html' %}
+{% block title %}Configuration{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-admin">
+    <div class="sidebar-logo"><div class="logo-box-sm"></div><div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div>
+    <nav class="sidebar-nav">
+      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a>
+      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link">✎ Huissiers</a>
+      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white active">⚙ Configuration</a>
+      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
+      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
+    </nav>
+    <div class="sidebar-user sidebar-user-dark"><div class="user-avatar">A</div><div><div class="user-name" style="color:#fff;">Administrateur</div></div><a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a></div>
+  </aside>
+  <main class="dashboard-main">
+    <header class="topbar"><h1 class="topbar-title">Configuration de la plateforme</h1></header>
+    <div class="content-area">
+      {% if messages %}{% for m in messages %}<div class="alert alert-success">{{ m }}</div>{% endfor %}{% endif %}
+      <!-- Config générale -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">Configuration générale</span></div>
+        <div class="card-body">
+          <form method="post" novalidate>{% csrf_token %}<input type="hidden" name="action" value="general">
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Nom de la plateforme</label><input type="text" name="nom_plateforme" class="form-input" value="{{ config.nom_plateforme }}"></div>
+              <div class="form-group"><label class="form-label">Pays</label><input type="text" name="pays" class="form-input" value="{{ config.pays }}"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Article de loi autorisant la signification électronique</label><textarea name="article_loi" class="form-input" rows="2">{{ config.article_loi_signification }}</textarea></div>
+            <div class="form-group"><label class="form-label">Décret de référence</label><input type="text" name="decret_reference" class="form-input" value="{{ config.decret_reference }}"></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Délai relance 1 (jours)</label><input type="number" name="delai_relance_1" class="form-input" value="{{ config.delai_relance_1_jours }}" min="1"></div>
+              <div class="form-group"><label class="form-label">Délai relance 2 (jours)</label><input type="number" name="delai_relance_2" class="form-input" value="{{ config.delai_relance_2_jours }}" min="1"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Méthode 2FA par défaut</label>
+                <select name="methode_2fa" class="form-input">
+                  <option value="email" {% if config.methode_2fa_defaut == 'email' %}selected{% endif %}>Email</option>
+                  <option value="otp" {% if config.methode_2fa_defaut == 'otp' %}selected{% endif %}>SMS OTP</option>
+                  <option value="totp" {% if config.methode_2fa_defaut == 'totp' %}selected{% endif %}>Authenticator</option>
+                </select>
+              </div>
+              <div class="form-group"><label class="form-label">Email de contact</label><input type="email" name="email_contact" class="form-input" value="{{ config.email_contact }}"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Texte copyright</label><input type="text" name="copyright_texte" class="form-input" value="{{ config.copyright_texte }}"></div>
+            <div style="text-align:right;"><button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…"><span class="btn-text">Enregistrer</span><span class="btn-loader" style="display:none;"></span></button></div>
+          </form>
+        </div>
+      </div>
+      <!-- Config Certigna -->
+      <div class="card">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="card-title">Horodatage qualifié — Certigna TSA</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="badge {% if config.certigna_active %}badge-actif{% else %}badge-inactif{% endif %}" id="certigna-badge">{% if config.certigna_active %}Activé{% else %}Désactivé{% endif %}</span>
+            <label class="toggle-switch" style="cursor:pointer;">
+              <input type="checkbox" id="certigna-toggle" {% if config.certigna_active %}checked{% endif %} onchange="toggleCertigna(this)">
+              <span class="toggle-slider-el"></span>
+            </label>
+          </div>
+        </div>
+        <div class="card-body" id="certigna-off" {% if config.certigna_active %}style="display:none;"{% endif %}>
+          <div class="info-empty" style="text-align:center;padding:24px;color:var(--text-secondary);">
+            <p>Activez le bouton bascule pour configurer Certigna.</p>
+            <p style="font-size:12px;margin-top:8px;">Sans Certigna, la plateforme utilise l'horodatage serveur NTP.</p>
+          </div>
+        </div>
+        <div class="card-body" id="certigna-on" {% if not config.certigna_active %}style="display:none;"{% endif %}>
+          <form method="post" novalidate>{% csrf_token %}<input type="hidden" name="action" value="certigna">
+            <input type="hidden" name="certigna_active" id="certigna_active_field" value="{% if config.certigna_active %}on{% endif %}">
+            <div class="info-box" style="margin-bottom:16px;">ℹ Stratégie lot Merkle : 1 jeton Certigna par jour, quel que soit le volume d'actes.</div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">URL TSA Certigna</label><input type="url" name="certigna_url" class="form-input" value="{{ config.certigna_tsa_url }}"></div>
+              <div class="form-group"><label class="form-label">Identifiant</label><input type="text" name="certigna_login" class="form-input" value="{{ config.certigna_login }}"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Mot de passe API</label><input type="password" name="certigna_password" class="form-input" placeholder="Laisser vide pour conserver l'actuel"></div>
+              <div class="form-group"><label class="form-label">OID politique TSA</label><input type="text" name="certigna_oid" class="form-input" value="{{ config.certigna_oid }}"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Heure lot quotidien</label><input type="time" name="certigna_heure" class="form-input" value="{{ config.certigna_heure_lot|time:'H:i' }}"></div>
+              <div class="form-group"><label class="form-label">Seuil alerte jetons</label><input type="number" name="seuil_jetons" class="form-input" value="{{ config.certigna_seuil_alerte_jetons }}" min="1"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="testerCertigna()">🔌 Tester la connexion</button>
+              <span id="test-result" style="font-size:12px;color:var(--text-secondary);"></span>
+            </div>
+            <div style="text-align:right;"><button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…"><span class="btn-text">Enregistrer Certigna</span><span class="btn-loader" style="display:none;"></span></button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+function toggleCertigna(cb) {
+  const on = cb.checked;
+  document.getElementById('certigna-off').style.display = on ? 'none' : 'block';
+  document.getElementById('certigna-on').style.display = on ? 'block' : 'none';
+  document.getElementById('certigna-badge').textContent = on ? 'Activé' : 'Désactivé';
+  document.getElementById('certigna-badge').className = 'badge ' + (on ? 'badge-actif' : 'badge-inactif');
+  document.getElementById('certigna_active_field').value = on ? 'on' : '';
+}
+function testerCertigna() {
+  const r = document.getElementById('test-result');
+  r.textContent = 'Test en cours…';
+  fetch('/api/certigna/tester/', {method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken'), 'Content-Type':'application/json'}})
+    .then(res => res.json())
+    .then(d => { r.innerHTML = d.success ? '<span style="color:#0d6e4f;">✓ ' + d.message + '</span>' : '<span style="color:#a32d2d;">✗ ' + d.message + '</span>'; })
+    .catch(() => { r.textContent = 'Erreur réseau.'; });
+}
+function getCookie(n) { let v = null; document.cookie.split(';').forEach(c => { if (c.trim().startsWith(n+'=')) v = decodeURIComponent(c.trim().slice(n.length+1)); }); return v; }
+</script>
+{% endblock %}

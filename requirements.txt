@@ -1,0 +1,53 @@
+# ============================================================
+# e-Signification Bénin — Dépendances Python
+# Installer avec : pip install -r requirements.txt
+# ============================================================
+
+# Framework principal
+Django==5.2.13
+
+# API REST
+djangorestframework==3.17.1
+
+# Authentification 2FA (TOTP / Email OTP)
+django-otp==1.7.0
+pyotp==2.9.0
+
+# Chiffrement AES-256 (Fernet)
+cryptography==44.0.3
+
+# Tâches asynchrones (relances, lot Merkle)
+celery==5.6.3
+redis==8.0.0
+
+# Variables d'environnement (.env)
+django-environ==0.13.0
+
+# Génération de PDF (certificats, constats)
+reportlab==4.4.1
+
+# Génération PDF avancée (optionnel)
+weasyprint==69.0
+
+# Traitement d'images
+Pillow==11.2.1
+
+# Utilitaires Django (shell_plus, etc.)
+django-extensions==4.1
+
+# ============================================================
+# PRODUCTION uniquement (décommenter pour le déploiement)
+# ============================================================
+
+# Serveur WSGI production
+# gunicorn==23.0.0
+
+# Base de données PostgreSQL (recommandé en production)
+# psycopg2-binary==2.9.10
+
+# ============================================================
+# OPTIONNEL — Intégrations tierces
+# ============================================================
+
+# Client HTTP (appels YouSign, Certigna)
+# requests==2.32.3

@@ -1,0 +1,41 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:'fr' }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{{ config.nom_plateforme|default:"e-Signification" }}{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
+{% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<div id="spinner-global" class="spinner-overlay" style="display:none;" role="status">
+  <div class="spinner-content">
+    <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+      <circle cx="32" cy="32" r="28" stroke="#dce8f8" stroke-width="4"/>
+      <circle cx="32" cy="32" r="28" stroke="#1a3c6e" stroke-width="4" stroke-dasharray="44 132" stroke-linecap="round">
+        <animateTransform attributeName="transform" type="rotate" from="0 32 32" to="360 32 32" dur="1s" repeatCount="indefinite"/>
+      </circle>
+      <path d="M14 38 Q12 34 16 32 L24 30" stroke="#1a3c6e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <rect x="10" y="36" width="8" height="5" rx="2" fill="#1a3c6e"/>
+      <rect x="22" y="25" width="20" height="14" rx="2" fill="white" stroke="#1a3c6e" stroke-width="1.5"/>
+      <line x1="26" y1="30" x2="38" y2="30" stroke="#1a3c6e" stroke-width="1.2"/>
+      <line x1="26" y1="33" x2="34" y2="33" stroke="#1a3c6e" stroke-width="1.2"/>
+      <path d="M50 38 Q52 34 48 32 L40 30" stroke="#1a3c6e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <rect x="46" y="36" width="8" height="5" rx="2" fill="#1a3c6e"/>
+    </svg>
+    <p class="spinner-text">Chargement en cours…</p>
+  </div>
+</div>
+{% if messages %}
+<div id="messages-container">
+{% for message in messages %}
+<div class="alert alert-{{ message.tags }}" role="alert">{{ message }}<button class="alert-close" onclick="this.parentElement.remove()">×</button></div>
+{% endfor %}
+</div>
+{% endif %}
+{% block body %}{% endblock %}
+<script src="{% static 'js/main.js' %}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

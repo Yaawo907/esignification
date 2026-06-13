@@ -1,0 +1,66 @@
+# Environnement virtuel
+
+venv/
+env/
+
+# Variables d'environnement
+
+.env
+
+# Base SQLite
+
+db.sqlite3
+
+# Fichiers Python
+
+**pycache**/
+*.py[cod]
+*$py.class
+
+# Logs
+
+*.log
+
+# Fichiers temporaires
+
+*.tmp
+*.bak
+
+# Django
+
+staticfiles/
+media/
+
+# VS Code
+
+.vscode/
+
+# JetBrains
+
+.idea/
+
+# Windows
+
+Thumbs.db
+Desktop.ini
+
+# Git Bash / Linux
+
+.wget-hsts
+
+# Node
+
+node_modules/
+.npm/
+.npmrc
+
+# Dossiers personnels à ne pas versionner
+
+.config/
+.local/
+
+# Fichiers Office
+
+*.docx
+*.xlsx
+plan_dev.js

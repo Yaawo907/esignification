@@ -1,0 +1,47 @@
+{% extends 'base/base.html' %}
+{% load static i18n %}
+{% block title %}Connexion — {{ config.nom_plateforme|default:"e-Signification" }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-box-lg"></div>
+      <h1 class="auth-title">{{ config.nom_plateforme|default:"e-Signification" }}</h1>
+      <p class="auth-subtitle">Plateforme de signification électronique</p>
+    </div>
+    <form method="post" novalidate id="form-connexion">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div class="form-error" role="alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <div class="form-group">
+        <label for="{{ form.email.id_for_label }}" class="form-label">Adresse email</label>
+        {{ form.email }}
+        {% if form.email.errors %}<p class="field-error">{{ form.email.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-group">
+        <label for="{{ form.mot_de_passe.id_for_label }}" class="form-label">Mot de passe</label>
+        {{ form.mot_de_passe }}
+        {% if form.mot_de_passe.errors %}<p class="field-error">{{ form.mot_de_passe.errors.0 }}</p>{% endif %}
+      </div>
+      <button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="Vérification…">
+        <span class="btn-text">Se connecter</span>
+        <span class="btn-loader" style="display:none;"><svg class="spin-icon" viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></path></svg></span>
+      </button>
+    </form>
+    <div class="auth-links">
+      <a href="{% url 'accounts:recuperation_compte' %}">Mot de passe oublié ?</a>
+    </div>
+    <div class="auth-lang">
+      <form method="post" action="{% url 'set_language' %}">{% csrf_token %}<input name="next" type="hidden" value="{{ request.path }}">
+        <select name="language" onchange="this.form.submit()" class="lang-select">
+          <option value="fr" {% if LANGUAGE_CODE == 'fr' %}selected{% endif %}>🇫🇷 Français</option>
+          <option value="en" {% if LANGUAGE_CODE == 'en' %}selected{% endif %}>🇬🇧 English</option>
+          <option value="es" {% if LANGUAGE_CODE == 'es' %}selected{% endif %}>🇪🇸 Español</option>
+        </select>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

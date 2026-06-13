@@ -1,0 +1,80 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Tableau de bord Justiciable{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-justiciable">
+    <div class="sidebar-logo">
+      <div class="logo-box-sm logo-green"></div>
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Espace justiciable</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Mon espace</div>
+      <a href="{% url 'justiciables:tableau_de_bord' %}" class="nav-item active nav-green">▦ Tableau de bord</a>
+      <a href="{% url 'justiciables:significations' %}" class="nav-item spinner-link">✉ Significations reçues <span class="nav-badge-green">{{ stats.en_attente }}</span></a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar user-avatar-green">{{ request.user.email|first|upper }}</div>
+      <div><div class="user-name">{{ profil.nom_complet }}</div><div class="user-role">Justiciable</div></div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn">⏻</a>
+    </div>
+  </aside>
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div><h1 class="topbar-title">Tableau de bord</h1><p class="topbar-sub">Bonjour {{ profil.prenom|default:profil.nom }}</p></div>
+    </header>
+    <div class="content-area">
+      {% if stats.en_attente > 0 %}
+      <div class="alert-banner">
+        <span>⚠</span>
+        <span><strong>{{ stats.en_attente }} signification(s) en attente</strong> — Consultez vos actes.</span>
+        <a href="{% url 'justiciables:significations' %}" class="btn btn-sm btn-orange spinner-link">Voir les actes</a>
+      </div>
+      {% endif %}
+      <div class="domicile-info">
+        <span class="domicile-icon">✓</span>
+        <span><strong>Domicile électronique :</strong> {{ profil.email_domicile }}{% if profil.email_domicile_verifie %} <span class="badge-verified">Vérifié</span>{% endif %}</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon stat-blue">📨</div><div class="stat-val">{{ stats.recues }}</div><div class="stat-label">Reçues</div></div>
+        <div class="stat-card"><div class="stat-icon stat-orange">⏳</div><div class="stat-val" style="color:#854f0b;">{{ stats.en_attente }}</div><div class="stat-label">En attente</div></div>
+        <div class="stat-card"><div class="stat-icon stat-green">✓</div><div class="stat-val" style="color:#0d6e4f;">{{ stats.acceptees }}</div><div class="stat-label">Acceptées</div></div>
+        <div class="stat-card"><div class="stat-icon stat-purple">↩</div><div class="stat-val">{{ stats.reponses_envoyees }}</div><div class="stat-label">Réponses</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Mes significations récentes</span>
+          <a href="{% url 'justiciables:significations' %}" class="card-action spinner-link">Voir tout →</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Huissier</th><th>Référence</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for sig in significations_recentes %}
+            <tr>
+              <td><div class="td-name">Me {{ sig.huissier.prenom }} {{ sig.huissier.nom }}</div><div class="td-sub">{{ sig.huissier.nom_etude }}</div></td>
+              <td>{{ sig.reference }}</td>
+              <td>{{ sig.date_envoi|date:"d/m/Y" }}</td>
+              <td><span class="badge badge-{{ sig.statut }}">{{ sig.get_statut_display }}</span></td>
+              <td>
+                {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
+                <a href="{% url 'significations:telecharger_acte' sig.uuid %}" class="btn btn-xs btn-blue spinner-link" target="_blank" data-loading="Chargement…">Ouvrir l'acte</a>
+                {% if sig.statut == 'acceptee' %}<a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}" class="btn btn-xs btn-blue spinner-link" data-loading="Téléchargement…">Certificat</a>{% endif %}
+                {% if sig.necessite_reponse and sig.statut == 'acceptee' %}
+                <a href="{% url 'justiciables:envoyer_reponse' sig.uuid %}" class="btn btn-xs btn-green spinner-link">Informer l'huissier</a>
+                {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="td-empty">Aucune signification reçue.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

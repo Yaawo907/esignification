@@ -1,0 +1,88 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Tableau de bord Huissier{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      <div class="logo-box-sm"></div>
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Espace huissier</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item active"><span class="nav-icon">▦</span> Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link"><span class="nav-icon">✉</span> Significations <span class="nav-badge">{{ stats.en_attente }}</span></a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link"><span class="nav-icon">⌕</span> Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link"><span class="nav-icon">+</span> Inviter</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div><div class="user-name">{{ huissier.nom_complet }}</div><div class="user-role">{{ huissier.nom_etude }}</div></div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div><h1 class="topbar-title">Tableau de bord</h1><p class="topbar-sub">Bonjour Me {{ huissier.prenom }}</p></div>
+      <div class="topbar-actions">
+        <a href="{% url 'significations:envoyer' %}" class="btn btn-primary spinner-link">✉ Nouvelle signification</a>
+        <button class="btn btn-icon notif-btn" id="notif-btn" aria-label="Notifications"><span>🔔</span><span class="notif-dot" id="notif-dot" style="display:none;"></span></button>
+      </div>
+    </header>
+    <div class="content-area">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon stat-blue">✉</div><div class="stat-val">{{ stats.envoyees }}</div><div class="stat-label">Envoyées</div></div>
+        <div class="stat-card"><div class="stat-icon stat-orange">⏳</div><div class="stat-val">{{ stats.en_attente }}</div><div class="stat-label">En attente</div></div>
+        <div class="stat-card"><div class="stat-icon stat-green">✓</div><div class="stat-val">{{ stats.acceptees }}</div><div class="stat-label">Acceptées</div></div>
+        <div class="stat-card"><div class="stat-icon stat-purple">↩</div><div class="stat-val">{{ stats.reponses_non_vues }}</div><div class="stat-label">Réponses</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Significations récentes</span><a href="{% url 'huissiers:significations' %}" class="card-action spinner-link">Voir tout →</a></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Justiciable</th><th>Référence</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for sig in significations_recentes %}
+            <tr>
+              <td><div class="td-name">{{ sig.justiciable.nom_complet }}</div></td>
+              <td>{{ sig.reference }}</td>
+              <td>{{ sig.date_envoi|date:"d/m/Y" }}</td>
+              <td><span class="badge badge-{{ sig.statut }}">{{ sig.get_statut_display }}</span></td>
+              <td>
+                {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
+                <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}" class="btn btn-xs btn-blue spinner-link" data-loading="Téléchargement…">Certificat</a>
+                {% endif %}
+                {% if sig.statut == 'non_delivree' or sig.statut == 'relance_2' %}
+                <a href="#" class="btn btn-xs">Constat</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="td-empty">Aucune signification pour le moment.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+// Polling notifications AJAX
+function checkNotifs() {
+  fetch('/api/notifications/', {headers: {'X-CSRFToken': getCookie('csrftoken')}})
+    .then(r => r.json())
+    .then(d => {
+      const dot = document.getElementById('notif-dot');
+      if (d.total > 0) { dot.style.display = 'block'; dot.title = d.total + ' notification(s)'; }
+      else dot.style.display = 'none';
+    }).catch(() => {});
+}
+checkNotifs();
+setInterval(checkNotifs, 30000);
+function getCookie(n) { let v = null; document.cookie.split(';').forEach(c => { if (c.trim().startsWith(n+'=')) v = decodeURIComponent(c.trim().slice(n.length+1)); }); return v; }
+</script>
+{% endblock %}

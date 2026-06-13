@@ -1,0 +1,75 @@
+{% extends 'base/base.html' %}
+{% block title %}Administration{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-admin">
+    <div class="sidebar-logo">
+      <div class="logo-box-sm"></div>
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Tableau de bord</div>
+      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white active">▦ Vue d'ensemble</a>
+      <div class="nav-section">Utilisateurs</div>
+      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link">✎ Huissiers</a>
+      <div class="nav-section">Paramétrage</div>
+      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a>
+      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
+      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
+    </nav>
+    <div class="sidebar-user sidebar-user-dark">
+      <div class="user-avatar">A</div>
+      <div><div class="user-name" style="color:#fff;">Administrateur</div><div class="user-role">Super admin</div></div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a>
+    </div>
+  </aside>
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div><h1 class="topbar-title">Vue d'ensemble</h1></div>
+      <a href="{% url 'administration:creer_huissier' %}" class="btn btn-primary spinner-link">+ Créer un huissier</a>
+    </header>
+    <div class="content-area">
+      <div class="stats-grid stats-grid-5">
+        <div class="stat-card"><div class="stat-icon stat-blue">✎</div><div class="stat-val">{{ stats.huissiers_actifs }}</div><div class="stat-label">Huissiers actifs</div></div>
+        <div class="stat-card"><div class="stat-icon stat-green">👥</div><div class="stat-val">{{ stats.justiciables }}</div><div class="stat-label">Justiciables</div></div>
+        <div class="stat-card"><div class="stat-icon stat-purple">✉</div><div class="stat-val">{{ stats.significations_total }}</div><div class="stat-label">Significations</div></div>
+        <div class="stat-card"><div class="stat-icon stat-orange">⏳</div><div class="stat-val">{{ stats.significations_attente }}</div><div class="stat-label">En attente</div></div>
+        <div class="stat-card"><div class="stat-icon stat-red">!</div><div class="stat-val">{{ stats.huissiers_attente }}</div><div class="stat-label">À valider</div></div>
+      </div>
+      <div class="two-col-grid">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Huissiers récents</span><a href="{% url 'administration:liste_huissiers' %}" class="card-action spinner-link">Voir tout →</a></div>
+          <table><thead><tr><th>Huissier</th><th>Étude</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
+          {% for h in huissiers_recents %}
+          <tr>
+            <td><div class="td-name">Me {{ h.prenom }} {{ h.nom }}</div><div class="td-sub">{{ h.user.email }}</div></td>
+            <td>{{ h.nom_etude }}</td>
+            <td><span class="badge badge-{{ h.statut }}">{{ h.get_statut_display }}</span></td>
+            <td>
+              <form method="post" action="{% url 'administration:statut_huissier' h.uuid %}" style="display:inline;">
+                {% csrf_token %}
+                {% if h.statut == 'actif' %}<input type="hidden" name="statut" value="inactif"><button class="btn btn-xs btn-red" type="submit">Désactiver</button>
+                {% else %}<input type="hidden" name="statut" value="actif"><button class="btn btn-xs btn-green" type="submit">Activer</button>{% endif %}
+              </form>
+            </td>
+          </tr>
+          {% empty %}<tr><td colspan="4" class="td-empty">Aucun huissier.</td></tr>{% endfor %}
+          </tbody></table>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Journal d'activité</span><a href="{% url 'administration:audit' %}" class="card-action spinner-link">Voir tout →</a></div>
+          <div class="activity-list">
+          {% for a in activites %}
+          <div class="activity-item">
+            <div class="a-dot"><span>•</span></div>
+            <div><div class="a-text">{{ a.action }} — <strong>{{ a.user_email }}</strong></div><div class="a-time">{{ a.date|date:"d/m/Y H:i" }}</div></div>
+          </div>
+          {% empty %}<p class="td-empty">Aucune activité.</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
