@@ -1,1 +1,209 @@
-{% extends 'base/base.html' %}{% block title %}Textes légaux{% endblock %}{% block body_class %}dashboard-page{% endblock %}{% block body %}<div class="dashboard-layout"><aside class="sidebar sidebar-admin"><div class="sidebar-logo"><div class="logo-box-sm"></div><div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div><nav class="sidebar-nav"><a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a><a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white">✎ Huissiers</a><a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a><a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a><a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a></nav><div class="sidebar-user sidebar-user-dark"><div class="user-avatar">A</div><a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a></div></aside><main class="dashboard-main"><header class="topbar"><h1 class="topbar-title">Textes légaux</h1></header><div class="content-area"><div class="card"><div class="card-header"><span class="card-title">Textes légaux</span></div><p class="td-empty" style="padding:24px;">Contenu à venir.</p></div></div></main></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Textes légaux{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-admin">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Tableau de bord</div>
+      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a>
+      <div class="nav-section">Utilisateurs</div>
+      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link">✎ Huissiers</a>
+      <div class="nav-section">Paramétrage</div>
+      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a>
+      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white active">§ Textes légaux</a>
+      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
+      <div class="nav-section" style="margin-top:10px;">Communication</div>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">&#9993; Messagerie</a>#9993; Messagerie</a>
+    </nav>
+    <div class="sidebar-user sidebar-user-dark">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div><div class="user-name" style="color:#fff;">{{ request.user.email }}</div><div class="user-role">Administrateur</div></div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a>
+    </div>
+  </aside>
+
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Textes légaux</h1>
+        <div class="topbar-sub">CGU, politique de confidentialité, mentions légales</div>
+      </div>
+    </header>
+
+    <div class="content-area">
+
+      {% if messages %}
+      {% for msg in messages %}
+      <div class="alert-banner {% if 'success' in msg.tags %}alert-success{% endif %}" style="margin-bottom:16px;">
+        <span>✓</span><span>{{ msg }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      <!-- Onglets -->
+      <div style="display:flex; gap:6px; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:0;">
+        {% with types_textes=textes|dictsort:"type_texte" %}
+        {% for texte in textes %}
+        <button type="button"
+          onclick="afficherOnglet('{{ texte.uuid }}')"
+          id="tab-{{ texte.uuid }}"
+          class="tab-btn"
+          style="padding:8px 16px; border:none; background:none; cursor:pointer; font-size:13px; font-weight:500; color:var(--text-secondary); border-bottom:2px solid transparent; margin-bottom:-2px;">
+          {{ texte.titre|truncatechars:30 }}
+          <span style="font-size:10px; color:var(--text-light);">({{ texte.langue|upper }})</span>
+        </button>
+        {% endfor %}
+        {% endwith %}
+        <button type="button" id="tab-nouveau" onclick="afficherOnglet('nouveau')"
+          style="padding:8px 16px; border:none; background:none; cursor:pointer; font-size:13px; color:var(--primary); border-bottom:2px solid transparent; margin-bottom:-2px;">
+          + Nouveau
+        </button>
+      </div>
+
+      <!-- Formulaires existants -->
+      {% for texte in textes %}
+      <div id="panel-{{ texte.uuid }}" class="texte-panel" style="display:none;">
+        <div class="card" style="padding:20px 24px;">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="uuid" value="{{ texte.uuid }}">
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px;">
+              <div class="form-group">
+                <label class="form-label">Type</label>
+                <select name="type_texte" class="form-input">
+                  <option value="cgu" {% if texte.type_texte == 'cgu' %}selected{% endif %}>CGU</option>
+                  <option value="confidentialite" {% if texte.type_texte == 'confidentialite' %}selected{% endif %}>Politique de confidentialité</option>
+                  <option value="mentions_legales" {% if texte.type_texte == 'mentions_legales' %}selected{% endif %}>Mentions légales</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Titre</label>
+                <input type="text" name="titre" class="form-input" value="{{ texte.titre }}">
+              </div>
+              <div style="display:flex; gap:10px;">
+                <div class="form-group" style="flex:1;">
+                  <label class="form-label">Langue</label>
+                  <select name="langue" class="form-input">
+                    <option value="fr" {% if texte.langue == 'fr' %}selected{% endif %}>Français</option>
+                    <option value="en" {% if texte.langue == 'en' %}selected{% endif %}>English</option>
+                    <option value="es" {% if texte.langue == 'es' %}selected{% endif %}>Español</option>
+                  </select>
+                </div>
+                <div class="form-group" style="flex:1;">
+                  <label class="form-label">Version</label>
+                  <input type="text" name="version" class="form-input" value="{{ texte.version }}">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Contenu HTML</label>
+              <textarea name="contenu_html" class="form-input" rows="18"
+                style="font-family:monospace; font-size:12px;">{{ texte.contenu_html }}</textarea>
+              <p class="form-hint">Vous pouvez utiliser du HTML. Enregistrez régulièrement.</p>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:12px; color:var(--text-secondary);">
+                Dernière modification : {{ texte.date_modification|date:"d/m/Y H:i" }}
+              </div>
+              <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+                Enregistrer
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      {% empty %}
+      <div id="panel-vide" style="text-align:center; padding:32px; color:var(--text-secondary); font-size:14px;">
+        Aucun texte légal configuré. Cliquez sur <strong>+ Nouveau</strong> pour en créer un.
+      </div>
+      {% endfor %}
+
+      <!-- Nouveau texte -->
+      <div id="panel-nouveau" class="texte-panel" style="display:none;">
+        <div class="card" style="padding:20px 24px;">
+          <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:16px;">
+            Nouveau texte légal
+          </div>
+          <form method="post" novalidate>
+            {% csrf_token %}
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px;">
+              <div class="form-group">
+                <label class="form-label">Type *</label>
+                <select name="type_texte" class="form-input">
+                  <option value="cgu">CGU</option>
+                  <option value="confidentialite">Politique de confidentialité</option>
+                  <option value="mentions_legales">Mentions légales</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Titre *</label>
+                <input type="text" name="titre" class="form-input" placeholder="Conditions Générales d'Utilisation">
+              </div>
+              <div style="display:flex; gap:10px;">
+                <div class="form-group" style="flex:1;">
+                  <label class="form-label">Langue</label>
+                  <select name="langue" class="form-input">
+                    <option value="fr">Français</option>
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                  </select>
+                </div>
+                <div class="form-group" style="flex:1;">
+                  <label class="form-label">Version</label>
+                  <input type="text" name="version" class="form-input" value="1.0">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Contenu HTML *</label>
+              <textarea name="contenu_html" class="form-input" rows="18"
+                style="font-family:monospace; font-size:12px;"
+                placeholder="<h2>1. Objet</h2>&#10;<p>Les présentes CGU...</p>"></textarea>
+            </div>
+            <div style="text-align:right;">
+              <button type="submit" class="btn btn-primary btn-spinner" data-loading="Création…">
+                Créer ce texte légal
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+var panneauxIds = [{% for texte in textes %}'{{ texte.uuid }}',{% endfor %}'nouveau'];
+
+function afficherOnglet(id) {
+  /* Masquer tous les panneaux */
+  document.querySelectorAll('.texte-panel').forEach(function(p) { p.style.display = 'none'; });
+  document.querySelectorAll('.tab-btn, #tab-nouveau').forEach(function(b) {
+    b.style.borderBottomColor = 'transparent';
+    b.style.color = 'var(--text-secondary)';
+  });
+  /* Afficher le bon panneau */
+  var panel = document.getElementById('panel-' + id);
+  if (panel) panel.style.display = 'block';
+  var tab = document.getElementById('tab-' + id);
+  if (tab) { tab.style.borderBottomColor = 'var(--primary)'; tab.style.color = 'var(--primary)'; }
+}
+
+/* Ouvrir le premier onglet au chargement */
+(function() {
+  var premier = panneauxIds[0];
+  if (premier && premier !== 'nouveau') afficherOnglet(premier);
+  else if (document.getElementById('panel-vide')) document.getElementById('panel-vide').style.display = 'block';
+})();
+</script>
+{% endblock %}
+
+{% endblock %}

@@ -19,7 +19,7 @@ from notifications.service import envoyer_recuperation_mdp
 @require_http_methods(["GET", "POST"])
 def connexion(request):
     if request.user.is_authenticated:
-        return redirect_apres_connexion(request.user)
+        return redirect(redirect_apres_connexion(request.user))
     form = ConnexionForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.cleaned_data['user']
@@ -254,3 +254,76 @@ def reinitialiser_mdp(request):
         except User.DoesNotExist:
             return render(request, 'accounts/token_invalide.html', {'erreur': 'Compte introuvable.'})
     return render(request, 'accounts/reinitialiser_mdp.html', {'form': form})
+
+
+def inscription_clerc(request):
+    """Activation du compte clerc via le lien d'invitation envoyé par l'huissier."""
+    token_brut = request.GET.get('token', '')
+    token_obj, erreur = valider_token(token_brut, TokenActivation.ACTIVATION_CLERC)
+    if erreur:
+        return render(request, 'accounts/token_invalide.html', {'erreur': erreur})
+
+    # Lire les métadonnées stockées dans le token
+    meta = token_obj.metadata or {}
+    email = token_obj.email
+    prenom = meta.get('prenom', '')
+    nom = meta.get('nom', '')
+
+    if request.method == 'POST':
+        nouveau_mdp = request.POST.get('nouveau_mdp', '').strip()
+        confirmer_mdp = request.POST.get('confirmer_mdp', '').strip()
+        erreur_form = None
+
+        if len(nouveau_mdp) < 10:
+            erreur_form = "Le mot de passe doit contenir au moins 10 caractères."
+        elif nouveau_mdp != confirmer_mdp:
+            erreur_form = "Les mots de passe ne correspondent pas."
+
+        if erreur_form:
+            return render(request, 'accounts/inscription_clerc.html', {
+                'email': email, 'prenom': prenom, 'nom': nom,
+                'erreur': erreur_form,
+            })
+
+        try:
+            # Créer ou récupérer le compte utilisateur
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={'role': User.CLERC, 'is_active': False}
+            )
+            if not created and user.role != User.CLERC:
+                return render(request, 'accounts/token_invalide.html',
+                              {'erreur': 'Un compte avec cet email existe déjà avec un rôle différent.'})
+
+            user.set_password(nouveau_mdp)
+            user.is_active = True
+            user.role = User.CLERC
+            user.save()
+
+            # Créer le ProfilClerc si inexistant
+            from huissiers.models import ProfilHuissier, ProfilClerc
+            huissier_uuid = meta.get('huissier_uuid')
+            huissier = get_object_or_404(ProfilHuissier, uuid=huissier_uuid)
+            ProfilClerc.objects.get_or_create(
+                user=user,
+                defaults={
+                    'huissier': huissier,
+                    'nom': nom,
+                    'prenom': prenom,
+                    'telephone': meta.get('telephone', ''),
+                    'actif': True,
+                }
+            )
+
+            marquer_token_utilise(token_obj)
+            journaliser(user, 'inscription_clerc', request=request)
+            messages.success(request, "Votre compte clerc a été activé. Vous pouvez vous connecter.")
+            return redirect('accounts:connexion')
+
+        except Exception as exc:
+            return render(request, 'accounts/token_invalide.html',
+                          {'erreur': f"Erreur lors de l'activation : {exc}"})
+
+    return render(request, 'accounts/inscription_clerc.html', {
+        'email': email, 'prenom': prenom, 'nom': nom,
+    })

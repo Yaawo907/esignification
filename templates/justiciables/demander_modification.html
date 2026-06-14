@@ -1,0 +1,300 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Demande de modification de profil{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-justiciable">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Espace justiciable</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="{% url 'justiciables:tableau_de_bord' %}" class="nav-item spinner-link nav-green">&#9638; Tableau de bord</a>
+      <a href="{% url 'justiciables:significations' %}" class="nav-item spinner-link nav-green">&#10003; Mes significations</a>
+      <a href="{% url 'justiciables:profil' %}" class="nav-item active nav-green">&#9998; Mon profil</a>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link nav-green">&#9993; Messagerie</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar user-avatar-green">{{ request.user.email|first|upper }}</div>
+      <div><div class="user-name">{{ profil.nom_complet }}</div><div class="user-role">Justiciable</div></div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">&#9211;</a>
+    </div>
+  </aside>
+
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Demande de modification de profil</h1>
+        <p class="topbar-sub"><a href="{% url 'justiciables:profil' %}" style="color:var(--text-secondary);text-decoration:none;font-size:13px;">&#8592; Retour au profil</a></p>
+      </div>
+    </header>
+
+    <div class="content-area">
+
+      {% if messages %}{% for m in messages %}
+      <div class="alert-banner {% if 'success' in m.tags %}alert-success{% endif %}" style="margin-bottom:12px;">
+        <span>{% if 'success' in m.tags %}✓{% else %}⚠{% endif %}</span>
+        <span>{{ m }}</span>
+      </div>
+      {% endfor %}{% endif %}
+
+      {% if demande_en_cours %}
+      <div class="alert-banner" style="margin-bottom:20px;">
+        <span>⚠</span>
+        <span><strong>Demande en cours</strong> — Soumise le {{ demande_en_cours.date_creation|date:"d/m/Y" }}. Attendez sa résolution avant d'en soumettre une nouvelle.</span>
+      </div>
+      {% else %}
+
+      <!-- Infos actuelles -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">Informations actuelles</span></div>
+        <div style="padding:16px 20px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 28px;">
+            <div><div style="font-size:11px;color:var(--text-light);">Nom</div><div style="font-size:14px;">{{ profil.nom }}</div></div>
+            <div><div style="font-size:11px;color:var(--text-light);">Prénom</div><div style="font-size:14px;">{{ profil.prenom|default:"—" }}</div></div>
+            <div><div style="font-size:11px;color:var(--text-light);">Téléphone</div><div style="font-size:14px;">{{ profil.telephone|default:"—" }}</div></div>
+            <div><div style="font-size:11px;color:var(--text-light);">IFU / NPI</div><div style="font-size:14px;">{{ profil.ifu|default:profil.npi|default:"—" }}</div></div>
+            <div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-light);">Adresse</div><div style="font-size:14px;">{{ profil.adresse|default:"—" }}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ ÉTAPE 1 : Recherche huissier — form GET SÉPARÉ ══ -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">1. Choisir l'huissier destinataire <span style="color:var(--red);">*</span></span></div>
+        <div style="padding:16px 20px;">
+          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:14px;">
+            L'huissier sélectionné vérifiera vos pièces justificatives et validera ou refusera la modification.
+          </p>
+
+          <!-- Huissier sélectionné -->
+          <div id="huissier-selectionne" style="display:none; margin-bottom:12px;">
+            <div style="background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-weight:600; font-size:14px;" id="h-nom"></div>
+                <div class="td-sub" id="h-etude"></div>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="changerHuissier()">Changer</button>
+            </div>
+          </div>
+
+          <!-- Recherche -->
+          <div id="zone-recherche-huissier">
+            <form method="get" action="{% url 'justiciables:demander_modification' %}" style="display:flex; gap:8px; margin-bottom:14px;">
+              <input type="text" name="q" class="form-input"
+                     placeholder="Nom, prénom ou étude…"
+                     value="{{ q }}" style="flex:1;" autocomplete="off">
+              <button type="submit" class="btn btn-primary btn-sm">Rechercher</button>
+            </form>
+
+            {% if huissiers %}
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Huissier</th><th>Étude</th><th></th></tr></thead>
+                <tbody>
+                {% for h in huissiers %}
+                <tr>
+                  <td><div class="td-name">Me {{ h.prenom }} {{ h.nom }}</div></td>
+                  <td><div class="td-sub">{{ h.nom_etude }}</div></td>
+                  <td>
+                    <button type="button" class="btn btn-xs btn-green"
+                      onclick="choisirHuissier('{{ h.uuid }}','Me {{ h.prenom|escapejs }} {{ h.nom|escapejs }}','{{ h.nom_etude|escapejs }}')">
+                      Sélectionner
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% elif q %}
+            <div style="padding:12px; font-size:13px; color:var(--text-secondary);">Aucun huissier trouvé pour "{{ q }}".</div>
+            {% else %}
+            <div style="padding:12px; font-size:13px; color:var(--text-secondary);">Saisissez un nom pour rechercher, ou parcourez la liste complète.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ ÉTAPE 2+3 : Modifications + PJ — form POST SÉPARÉ ══ -->
+      <form method="post" enctype="multipart/form-data" novalidate id="form-demande">
+        {% csrf_token %}
+        <input type="hidden" name="huissier_uuid" id="huissier-uuid-input" value="">
+
+        <!-- Nouvelles informations -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <span class="card-title">2. Informations à modifier</span>
+            <span style="font-size:12px; color:var(--text-secondary);">Au moins un champ obligatoire</span>
+          </div>
+          <div style="padding:16px 20px;">
+            <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
+              Laissez vide les champs que vous ne souhaitez <strong>pas</strong> modifier.
+            </p>
+            {% if profil.type_compte == 'entreprise' %}
+            <div class="form-group">
+              <label class="form-label">Nom de l'entreprise</label>
+              <input type="text" name="nouveau_nom_entreprise" class="form-input champ-modif"
+                     placeholder="Nouveau nom d'entreprise">
+            </div>
+            {% else %}
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div class="form-group">
+                <label class="form-label">Nom de famille</label>
+                <input type="text" name="nouveau_nom" class="form-input champ-modif" placeholder="Nouveau nom">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Prénom</label>
+                <input type="text" name="nouveau_prenom" class="form-input champ-modif" placeholder="Nouveau prénom">
+              </div>
+            </div>
+            {% endif %}
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px;">
+              <div class="form-group">
+                <label class="form-label">Téléphone</label>
+                <input type="text" name="nouveau_telephone" class="form-input champ-modif"
+                       placeholder="{{ profil.telephone|default:'Nouveau numéro' }}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Numéro IFU</label>
+                <input type="text" name="nouveau_ifu" class="form-input champ-modif"
+                       placeholder="{{ profil.ifu|default:'Nouveau IFU' }}">
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px;">
+              <div class="form-group">
+                <label class="form-label">Numéro NPI</label>
+                <input type="text" name="nouveau_npi" class="form-input champ-modif"
+                       placeholder="{{ profil.npi|default:'Nouveau NPI' }}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Adresse</label>
+                <input type="text" name="nouvelle_adresse" class="form-input champ-modif"
+                       placeholder="{{ profil.adresse|default:'Nouvelle adresse' }}">
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:14px;">
+              <label class="form-label">Message à l'huissier <span style="color:var(--text-secondary);font-weight:400;">(facultatif)</span></label>
+              <textarea name="message_justiciable" class="form-input" rows="3"
+                placeholder="Expliquez le motif de la demande, ex. : changement de nom suite à mariage…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pièces justificatives -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header">
+            <span class="card-title">3. Pièces justificatives</span>
+            <span style="font-size:12px; color:var(--text-secondary);">facultatif — max 5 Mo</span>
+          </div>
+          <div style="padding:16px 20px;">
+            <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
+              Joignez les documents prouvant la modification (acte de naissance, carte NPI, IFU…).
+            </p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div class="form-group">
+                <label class="form-label">Pièce 1</label>
+                <label class="upload-zone-sm" id="zone-piece-1">
+                  <input type="file" name="piece_1" id="piece-1-input" style="display:none;"
+                         accept=".pdf,.jpg,.jpeg,.png" onchange="afficherPiece(this,'piece-1-label')">
+                  <span id="piece-1-label">&#128206; Choisir (PDF, JPG, PNG)</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Pièce 2 <span style="color:var(--text-secondary);font-weight:400;">(optionnel)</span></label>
+                <label class="upload-zone-sm" id="zone-piece-2">
+                  <input type="file" name="piece_2" id="piece-2-input" style="display:none;"
+                         accept=".pdf,.jpg,.jpeg,.png" onchange="afficherPiece(this,'piece-2-label')">
+                  <span id="piece-2-label">&#128206; Choisir (PDF, JPG, PNG)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding-bottom:20px;">
+          <div id="hint-validation" style="font-size:12px; color:var(--text-secondary);">
+            ⬆ Sélectionnez un huissier et remplissez au moins un champ
+          </div>
+          <div>
+            <a href="{% url 'justiciables:profil' %}" class="btn btn-ghost" style="margin-right:8px;">Annuler</a>
+            <button type="submit" class="btn btn-primary" id="btn-soumettre" disabled>
+              &#10148; Soumettre la demande
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {% endif %}
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+function choisirHuissier(uuid, nom, etude) {
+  document.getElementById('huissier-uuid-input').value = uuid;
+  document.getElementById('h-nom').textContent = nom;
+  document.getElementById('h-etude').textContent = etude;
+  document.getElementById('huissier-selectionne').style.display = '';
+  document.getElementById('zone-recherche-huissier').style.display = 'none';
+  verifier();
+}
+function changerHuissier() {
+  document.getElementById('huissier-uuid-input').value = '';
+  document.getElementById('huissier-selectionne').style.display = 'none';
+  document.getElementById('zone-recherche-huissier').style.display = '';
+  verifier();
+}
+function afficherPiece(input, labelId) {
+  var label = document.getElementById(labelId);
+  if (input.files && input.files[0]) {
+    var f = input.files[0];
+    if (f.size > 5 * 1024 * 1024) {
+      alert('Ce fichier dépasse 5 Mo.');
+      input.value = '';
+      label.textContent = '📄 Choisir (PDF, JPG, PNG)';
+      return;
+    }
+    label.textContent = '✔ ' + f.name + ' (' + (f.size / 1024).toFixed(0) + ' Ko)';
+    label.style.color = 'var(--primary)';
+  }
+}
+function verifier() {
+  var uuidOk = !!document.getElementById('huissier-uuid-input').value.trim();
+  var champOk = false;
+  document.querySelectorAll('.champ-modif').forEach(function(inp) {
+    if (inp.value.trim()) champOk = true;
+  });
+  var ok = uuidOk && champOk;
+  document.getElementById('btn-soumettre').disabled = !ok;
+  var hint = document.getElementById('hint-validation');
+  if (ok) {
+    hint.textContent = '✓ Prêt à soumettre';
+    hint.style.color = 'var(--primary)';
+  } else if (!uuidOk) {
+    hint.textContent = '⬆ Sélectionnez un huissier destinataire';
+    hint.style.color = 'var(--text-secondary)';
+  } else {
+    hint.textContent = '⬆ Remplissez au moins un champ à modifier';
+    hint.style.color = 'var(--text-secondary)';
+  }
+}
+document.querySelectorAll('.champ-modif').forEach(function(el) {
+  el.addEventListener('input', verifier);
+});
+</script>
+<style>
+.upload-zone-sm {
+  display:flex; align-items:center; padding:12px 16px;
+  border:2px dashed var(--border); border-radius:8px;
+  cursor:pointer; font-size:13px; color:var(--text-secondary);
+  transition:border-color .2s; width:100%; box-sizing:border-box;
+}
+.upload-zone-sm:hover { border-color:var(--primary); color:var(--primary); }
+</style>
+{% endblock %}

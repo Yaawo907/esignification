@@ -6,6 +6,7 @@ urlpatterns = [
     path('huissiers/', views.liste_huissiers, name='liste_huissiers'),
     path('huissiers/creer/', views.creer_huissier, name='creer_huissier'),
     path('huissiers/<uuid:uuid>/statut/', views.changer_statut_huissier, name='statut_huissier'),
+    path('huissiers/<uuid:uuid>/renvoyer-invitation/', views.renvoyer_invitation_huissier, name='renvoyer_invitation'),
     path('configuration/', views.configuration, name='configuration'),
     path('textes-legaux/', views.gerer_textes_legaux, name='textes_legaux'),
     path('audit/', views.audit, name='audit'),

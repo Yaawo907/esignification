@@ -1,0 +1,224 @@
+{% extends 'base/base.html' %}
+{% block title %}Mes clercs — {{ huissier.nom_etude }}{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Espace huissier</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link"><span class="nav-icon">▦</span> Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link"><span class="nav-icon">✉</span> Significations</a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link"><span class="nav-icon">⌕</span> Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link"><span class="nav-icon">+</span> Inviter</a>
+      <div class="nav-section" style="margin-top:10px;">Étude</div>
+      <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item active"><span class="nav-icon">👥</span> Mes clercs</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ huissier.nom_complet }}</div>
+        <div class="user-role">{{ huissier.nom_etude }}</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Mes clercs assermentés</h1>
+        <div class="topbar-sub">{{ clercs.count }} clerc{% if clercs.count != 1 %}s{% endif %} dans l'étude</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary" onclick="ouvrirFormInvitation()">+ Inviter un clerc</button>
+      </div>
+    </header>
+
+    <div class="content-area">
+
+      {% if messages %}
+      {% for msg in messages %}
+      <div class="alert-banner {% if 'success' in msg.tags %}alert-success{% endif %}" style="margin-bottom:16px;">
+        <span>{% if 'success' in msg.tags %}✓{% else %}⚠{% endif %}</span>
+        <span>{{ msg }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      <!-- Panneau invitation (masqué par défaut) -->
+      <div id="panel-invitation" style="display:none; margin-bottom:16px;">
+        <div class="card" style="padding:20px 24px; border:1.5px solid #1a3c6e;">
+          <div style="font-size:13px; font-weight:600; color:#1a3c6e; margin-bottom:14px; display:flex; justify-content:space-between;">
+            <span>Inviter un nouveau clerc</span>
+            <button type="button" onclick="fermerFormInvitation()" style="background:none;border:none;cursor:pointer;color:var(--text-light);font-size:16px;">✕</button>
+          </div>
+          <form method="post" action="{% url 'huissiers:inviter_clerc' %}" novalidate id="form-inviter-clerc">
+            {% csrf_token %}
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 16px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Prénom *</label>
+                <input type="text" name="prenom" class="form-input" placeholder="Jean" required autocomplete="off">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Nom *</label>
+                <input type="text" name="nom" class="form-input" placeholder="DUPONT" required autocomplete="off">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Email *</label>
+                <input type="email" name="email" class="form-input" placeholder="clerc@etude.bj" required autocomplete="off">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Téléphone</label>
+                <input type="text" name="telephone" class="form-input" placeholder="+229 …" autocomplete="off">
+              </div>
+            </div>
+            <div id="msg-invitation" style="display:none; margin-top:10px; font-size:13px;"></div>
+            <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:10px;">
+              <button type="button" onclick="fermerFormInvitation()" class="btn btn-ghost">Annuler</button>
+              <button type="submit" class="btn btn-primary btn-spinner" data-loading="Envoi…">
+                Envoyer l'invitation
+              </button>
+            </div>
+          </form>
+          <div style="margin-top:10px; font-size:12px; color:var(--text-secondary);">
+            Le clerc recevra un email avec un lien d'activation valable 72 heures.
+          </div>
+        </div>
+      </div>
+
+      <!-- Tableau des clercs -->
+      <div class="card">
+        {% if clercs %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Clerc</th>
+                <th>Email</th>
+                <th>Téléphone</th>
+                <th>Depuis</th>
+                <th>Statut</th>
+                <th style="text-align:right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for clerc in clercs %}
+              <tr id="row-clerc-{{ clerc.uuid }}">
+                <td>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="
+                      width:34px; height:34px; border-radius:50%; background:#1a3c6e; color:#fff;
+                      display:flex; align-items:center; justify-content:center;
+                      font-size:12px; font-weight:700; flex-shrink:0; text-transform:uppercase;">
+                      {{ clerc.prenom|first }}{{ clerc.nom|first }}
+                    </div>
+                    <div>
+                      <div class="td-name">{{ clerc.prenom }} {{ clerc.nom }}</div>
+                      <div class="td-sub">Clerc assermenté</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div style="font-size:13px;">{{ clerc.user.email }}</div>
+                </td>
+                <td>
+                  <div style="font-size:13px; color:var(--text-secondary);">{{ clerc.telephone|default:"—" }}</div>
+                </td>
+                <td>
+                  <div style="font-size:12px; color:var(--text-secondary);">{{ clerc.date_creation|date:"d/m/Y" }}</div>
+                </td>
+                <td>
+                  <span id="badge-clerc-{{ clerc.uuid }}"
+                    class="badge {% if clerc.actif %}badge-acceptee{% else %}badge-refusee{% endif %}">
+                    {% if clerc.actif %}Actif{% else %}Inactif{% endif %}
+                  </span>
+                </td>
+                <td style="text-align:right;">
+                  <form method="post" action="{% url 'huissiers:toggle_clerc' clerc.uuid %}"
+                    id="form-toggle-{{ clerc.uuid }}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="button"
+                      class="btn btn-sm {% if clerc.actif %}btn-ghost{% else %}btn-green{% endif %}"
+                      id="btn-toggle-{{ clerc.uuid }}"
+                      onclick="toggleClerc('{{ clerc.uuid }}', {{ clerc.actif|yesno:'true,false' }})">
+                      {% if clerc.actif %}Désactiver{% else %}Activer{% endif %}
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div style="text-align:center; padding:48px 24px; color:var(--text-secondary);">
+          <div style="font-size:36px; margin-bottom:12px;">👥</div>
+          <div style="font-weight:600; margin-bottom:6px;">Aucun clerc dans votre étude</div>
+          <div style="font-size:13px; margin-bottom:16px;">Invitez un clerc assermenté pour lui donner accès à la plateforme.</div>
+          <button class="btn btn-primary" onclick="ouvrirFormInvitation()">+ Inviter un clerc</button>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Info sécurité -->
+      <div style="margin-top:14px; padding:12px 16px; background:#f0f4fb; border:1px solid #c5d3e8; border-radius:8px; font-size:12px; color:#1a3c6e; display:flex; gap:8px;">
+        <span>ℹ</span>
+        <span>Un clerc désactivé ne peut plus se connecter. Il peut être réactivé à tout moment. Seul l'huissier titulaire peut gérer les clercs de son étude.</span>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+function ouvrirFormInvitation() {
+  var p = document.getElementById('panel-invitation');
+  if (p) { p.style.display = 'block'; p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+
+function fermerFormInvitation() {
+  var p = document.getElementById('panel-invitation');
+  if (p) p.style.display = 'none';
+}
+
+function toggleClerc(uuid, estActif) {
+  var action = estActif ? 'désactiver' : 'activer';
+  if (!confirm('Voulez-vous ' + action + ' ce clerc ?')) return;
+
+  var form = document.getElementById('form-toggle-' + uuid);
+  if (!form) return;
+
+  var data = new FormData(form);
+  fetch(form.action, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': data.get('csrfmiddlewaretoken') },
+    body: data,
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (!d.success) { alert(d.error || 'Erreur.'); return; }
+    var badge = document.getElementById('badge-clerc-' + uuid);
+    var btn = document.getElementById('btn-toggle-' + uuid);
+    if (d.actif) {
+      if (badge) { badge.className = 'badge badge-acceptee'; badge.textContent = 'Actif'; }
+      if (btn) { btn.className = 'btn btn-sm btn-ghost'; btn.textContent = 'Désactiver'; btn.onclick = function() { toggleClerc(uuid, true); }; }
+    } else {
+      if (badge) { badge.className = 'badge badge-refusee'; badge.textContent = 'Inactif'; }
+      if (btn) { btn.className = 'btn btn-sm btn-green'; btn.textContent = 'Activer'; btn.onclick = function() { toggleClerc(uuid, false); }; }
+    }
+  })
+  .catch(function() { alert('Erreur réseau.'); });
+}
+</script>
+{% endblock %}
+
+{% endblock %}

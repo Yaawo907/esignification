@@ -1,0 +1,24 @@
+<aside class="sidebar sidebar-huissier" style="{% if request.user.role == 'justiciable' %}background:var(--green-dark,#134e3a);{% endif %}">
+  <div class="sidebar-logo">
+    {% include 'base/_logo_sm.html' %}
+    <div><div class="logo-name">e-Signification</div><div class="logo-sub">Messagerie</div></div>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link">&#9993; Conversations</a>
+    <a href="{% url 'messagerie:nouvelle_conversation' %}" class="nav-item spinner-link">+ Nouveau message</a>
+    <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.15);padding-top:12px;">
+      {% if request.user.role == 'huissier' or request.user.role == 'clerc' %}
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link" style="font-size:12px;opacity:.8;">&#8592; Espace huissier</a>
+      {% elif request.user.role == 'justiciable' %}
+      <a href="{% url 'justiciables:tableau_de_bord' %}" class="nav-item spinner-link" style="font-size:12px;opacity:.8;">&#8592; Espace justiciable</a>
+      {% elif request.user.role == 'admin' %}
+      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item spinner-link" style="font-size:12px;opacity:.8;">&#8592; Administration</a>
+      {% endif %}
+    </div>
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+    <div><div class="user-name">{{ request.user.email }}</div></div>
+    <a href="{% url 'accounts:deconnexion' %}" class="logout-btn">&#9211;</a>
+  </div>
+</aside>

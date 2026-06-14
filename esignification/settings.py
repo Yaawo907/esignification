@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'securite',
     'taches',
     'api',
+    'messagerie',
 ]
 
 MIDDLEWARE = [

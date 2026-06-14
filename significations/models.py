@@ -50,6 +50,9 @@ class Signification(models.Model):
     hash_acte = models.CharField(max_length=64, blank=True)
     hash_merkle_position = models.IntegerField(null=True, blank=True)
 
+    # Signature visuelle de l'huissier (PNG base64)
+    signature_huissier_b64 = models.TextField(blank=True)
+
     # Motif refus
     motif_refus = models.TextField(blank=True)
 

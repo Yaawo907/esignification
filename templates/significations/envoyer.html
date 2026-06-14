@@ -1,75 +1,553 @@
 {% extends 'base/base.html' %}
-{% block title %}Envoyer une signification{% endblock %}
+{% block title %}Nouvelle signification{% endblock %}
 {% block body_class %}dashboard-page{% endblock %}
+
 {% block body %}
-<div class="auth-container" style="max-width:640px;">
-  <div class="auth-card">
-    <h2 class="auth-title">Envoyer une signification</h2>
-    {% if justiciable %}
-    <div class="info-box" style="margin-bottom:16px;">Justiciable sélectionné : <strong>{{ justiciable.nom_complet }}</strong> — {{ justiciable.email_domicile }}</div>
-    {% endif %}
-    <form method="post" enctype="multipart/form-data" novalidate>
-      {% csrf_token %}
-      {% if justiciable %}<input type="hidden" name="justiciable_uuid" value="{{ justiciable.uuid }}">{% endif %}
-      <div class="form-group">
-        <label class="form-label">Justiciable destinataire</label>
-        <div style="display:flex;gap:8px;">
-          <input type="text" id="search-just" class="form-input" placeholder="Rechercher par NPI, IFU, email…" autocomplete="off">
-          <input type="hidden" name="justiciable_uuid" id="just-uuid" value="{{ justiciable.uuid|default:'' }}">
+<div class="dashboard-layout">
+
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div>
+        <div class="logo-name">e-Signification</div>
+        <div class="logo-sub">Espace huissier</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link">▦ Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link">✉ Significations</a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link">⌕ Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link">+ Inviter</a>
+      <div class="nav-section" style="margin-top:10px;">Étude</div>
+      <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item spinner-link">👥 Mes clercs</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ request.user.email }}</div>
+        <div class="user-role">Huissier</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <main class="dashboard-main">
+
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Nouvelle signification</h1>
+        <div class="topbar-sub">Remplissez le formulaire et joignez l'acte PDF signé</div>
+      </div>
+      <div class="topbar-actions">
+        <a href="{% url 'huissiers:significations' %}" class="btn btn-ghost spinner-link">← Retour</a>
+      </div>
+    </header>
+
+    <div class="content-area" style="max-width:680px;">
+
+      {% if messages %}
+      {% for msg in messages %}
+      <div class="alert-banner {% if 'error' in msg.tags %}alert-error{% endif %}" style="margin-bottom:16px;">
+        <span>{% if 'error' in msg.tags %}⚠{% else %}✓{% endif %}</span>
+        <span>{{ msg }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      <!-- ══════════════════════════════════════════════════════════
+           ETAPE 1 : Destinataire
+           Ce bloc est HORS du form POST pour pouvoir contenir
+           son propre form GET de recherche (pas d'imbrication).
+           ══════════════════════════════════════════════════════════ -->
+      <div class="card" style="margin-bottom:16px; padding:20px 24px;">
+
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px;">
+          1 · Destinataire
         </div>
-        <div id="search-results" class="search-dropdown" style="display:none;"></div>
-        {% if justiciable %}<p class="form-hint" style="color:#0d6e4f;">✓ {{ justiciable.nom_complet }} — {{ justiciable.email_domicile }}</p>{% endif %}
-      </div>
-      <div class="form-group">
-        <label class="form-label">Acte à signifier (PDF signé) *</label>
-        <input type="file" name="fichier_acte" class="form-input" accept=".pdf" required>
-        <p class="form-hint">Le fichier doit être un PDF signé électroniquement avec YouSign avant upload.</p>
-      </div>
-      <div class="form-group form-check">
-        <input type="checkbox" name="necessite_reponse" id="necessite_reponse">
-        <label for="necessite_reponse">Cet acte nécessite une réponse du justiciable</label>
-      </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <a href="{% url 'huissiers:tableau_de_bord' %}" class="btn btn-ghost">Annuler</a>
-        <button type="submit" class="btn btn-primary btn-spinner" data-loading="Envoi en cours…">
-          <span class="btn-text">✉ Envoyer la signification</span>
-          <span class="btn-loader" style="display:none;"></span>
-        </button>
-      </div>
-    </form>
-  </div>
+
+        <!-- Justiciable sélectionné (carte verte) -->
+        <div id="just-selectionne" style="{% if not justiciable %}display:none;{% endif %}">
+          <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:16px 18px; display:flex; align-items:center; gap:14px;">
+            <div id="just-avatar" style="width:44px; height:44px; border-radius:50%; background:#134e3a; color:#fff;
+              display:flex; align-items:center; justify-content:center;
+              font-size:15px; font-weight:700; flex-shrink:0; text-transform:uppercase;">
+              {% if justiciable %}{{ justiciable.nom|first }}{% if justiciable.prenom %}{{ justiciable.prenom|first }}{% endif %}{% endif %}
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div id="just-nom" style="font-weight:600; font-size:15px; color:#134e3a;">
+                {% if justiciable %}{% if justiciable.prenom %}{{ justiciable.prenom }} {% endif %}{{ justiciable.nom }}{% endif %}
+              </div>
+              <div id="just-email" style="font-size:12px; color:#166534; margin-top:2px;">
+                {% if justiciable %}{{ justiciable.email_domicile }}{% endif %}
+              </div>
+              <div id="just-detail" style="font-size:11px; color:#4d7c0f; margin-top:2px; font-family:monospace;">
+                {% if justiciable %}{% if justiciable.npi %}NPI : {{ justiciable.npi }}{% endif %}{% if justiciable.npi and justiciable.ifu %} · {% endif %}{% if justiciable.ifu %}IFU : {{ justiciable.ifu }}{% endif %}{% endif %}
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;">
+              <span style="background:#134e3a; color:#fff; border-radius:999px; padding:3px 12px; font-size:11px; font-weight:600;">✓ Sélectionné</span>
+              <button type="button" onclick="afficherRecherche()" class="btn btn-xs btn-ghost" style="font-size:11px;">Changer</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zone de recherche (form GET autonome) -->
+        <div id="zone-recherche" style="{% if justiciable %}display:none;{% endif %}">
+
+          <form method="get" action="{% url 'significations:envoyer' %}" id="form-recherche-just"
+            style="display:flex; gap:8px; align-items:stretch;">
+            <div style="position:relative; flex:1;">
+              <input type="text" name="q" id="search-just" class="form-input"
+                value="{{ q|default:'' }}"
+                placeholder="Rechercher par nom, NPI, IFU ou email…"
+                autocomplete="off"
+                style="padding-left:34px;"
+                {% if not justiciable %}autofocus{% endif %}>
+              <span style="position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:14px; pointer-events:none;">⌕</span>
+            </div>
+            <button type="submit" class="btn btn-primary" style="white-space:nowrap; padding:0 20px;">
+              Rechercher
+            </button>
+            {% if q %}
+            <a href="{% url 'significations:envoyer' %}" class="btn btn-ghost" style="padding:0 14px;" title="Effacer">✕</a>
+            {% endif %}
+          </form>
+
+          <div style="margin-top:6px; font-size:12px; color:var(--text-secondary);">
+            Seuls les justiciables avec domicile électronique vérifié apparaissent.
+          </div>
+
+          {% if q and not resultats_recherche %}
+          <div style="margin-top:14px; padding:14px 16px; background:#fffbea; border:1px solid #fde68a; border-radius:8px; font-size:13px; color:#78350f;">
+            Aucun résultat pour <strong>« {{ q }} »</strong>. Essayez avec le NPI, IFU ou email.
+          </div>
+          {% endif %}
+
+          {% if resultats_recherche %}
+          <div style="margin-top:12px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+            {% for j in resultats_recherche %}
+            <div style="display:flex; align-items:center; gap:12px; padding:12px 16px;
+              border-bottom:{% if not forloop.last %}1px solid #f1f5f9{% else %}none{% endif %};
+              cursor:pointer; transition:background .15s;"
+              onmouseover="this.style.background='#f0fdf4'"
+              onmouseout="this.style.background=''"
+              onclick="choisirJusticiable(
+                '{{ j.uuid }}',
+                '{% if j.prenom %}{{ j.prenom|escapejs }} {% endif %}{{ j.nom|escapejs }}',
+                '{{ j.email_domicile|escapejs }}',
+                '{% if j.prenom %}{{ j.prenom|first|escapejs }}{% endif %}{{ j.nom|first|escapejs }}',
+                '{% if j.npi %}NPI : {{ j.npi|escapejs }}{% endif %}{% if j.npi and j.ifu %} · {% endif %}{% if j.ifu %}IFU : {{ j.ifu|escapejs }}{% endif %}'
+              )">
+              <div style="width:38px; height:38px; border-radius:50%; background:#134e3a; color:#fff;
+                display:flex; align-items:center; justify-content:center;
+                font-size:13px; font-weight:700; flex-shrink:0; text-transform:uppercase; pointer-events:none;">
+                {% if j.prenom %}{{ j.prenom|first }}{% endif %}{{ j.nom|first }}
+              </div>
+              <div style="flex:1; min-width:0; pointer-events:none;">
+                <div style="font-size:14px; font-weight:600; color:#0f172a;">
+                  {% if j.prenom %}{{ j.prenom }} {% endif %}{{ j.nom }}
+                </div>
+                <div style="font-size:12px; color:#64748b; margin-top:2px;">
+                  {{ j.email_domicile }}
+                  {% if j.npi %} · <span style="font-family:monospace;">NPI {{ j.npi }}</span>{% endif %}
+                  {% if j.ifu %} · <span style="font-family:monospace;">IFU {{ j.ifu }}</span>{% endif %}
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-green" style="flex-shrink:0; pointer-events:none;">
+                ✓ Choisir
+              </button>
+            </div>
+            {% endfor %}
+          </div>
+          <div style="margin-top:6px; font-size:11px; color:var(--text-secondary);">
+            {{ resultats_recherche|length }} résultat{% if resultats_recherche|length != 1 %}s{% endif %} — cliquez sur un justiciable pour le sélectionner.
+          </div>
+          {% endif %}
+
+        </div><!-- /zone-recherche -->
+
+      </div><!-- /card étape 1 -->
+
+      <!-- ══════════════════════════════════════════════════════════
+           ETAPE 2 + ENVOI : form POST (aucun form imbriqué)
+           ══════════════════════════════════════════════════════════ -->
+      <form method="post" enctype="multipart/form-data" novalidate id="form-envoi">
+        {% csrf_token %}
+        <!-- UUID mis à jour par JS quand l'utilisateur choisit un justiciable -->
+        <input type="hidden" name="justiciable_uuid" id="just-uuid" value="{{ justiciable.uuid|default:'' }}">
+
+        <!-- Acte à signifier -->
+        <div class="card" style="margin-bottom:16px; padding:20px 24px;">
+          <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px;">
+            2 · Acte à signifier
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="fichier_acte">Fichier PDF signé *</label>
+            <input type="file" name="fichier_acte" id="fichier_acte" class="form-input"
+              accept=".pdf" required onchange="afficherNomFichier(this)">
+            <div id="nom-fichier" style="margin-top:6px; font-size:12px; color:#134e3a; display:none;"></div>
+            <p class="form-hint">Le fichier doit être un PDF. Taille max : 20 Mo.</p>
+          </div>
+          <div class="form-group form-check" style="margin-top:4px;">
+            <input type="checkbox" name="necessite_reponse" id="necessite_reponse">
+            <label for="necessite_reponse" style="font-size:14px; cursor:pointer;">
+              Cet acte nécessite une <strong>réponse formelle</strong> du justiciable
+            </label>
+          </div>
+          <p class="form-hint" style="margin-top:2px; margin-left:22px;">Si coché, le justiciable pourra joindre un document de réponse depuis son espace.</p>
+        </div>
+
+        <!-- Signature numérique -->
+        <div class="card" style="margin-bottom:16px; padding:20px 24px;">
+          <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">
+            3 · Signature numérique <span style="color:#e53e3e;">*</span>
+          </div>
+
+          {% if params_sig and params_sig.signature_simple_b64 or params_sig and params_sig.signature_cachet_b64 or params_sig and params_sig.cachet_simple_b64 %}
+          <!-- Signatures enregistrées -->
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+            Choisissez un tampon enregistré ou dessinez une signature ponctuelle.
+          </p>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:10px; margin-bottom:14px;">
+            {% if params_sig.signature_simple_b64 %}
+            <label class="sig-choix" onclick="choisirSigEnregistree('{{ params_sig.signature_simple_b64|escapejs }}', 'choix-simple')">
+              <input type="radio" name="_sig_radio" id="choix-simple" style="display:none;">
+              <img src="{{ params_sig.signature_simple_b64 }}" alt="Signature simple"
+                   style="max-height:52px; max-width:100%; object-fit:contain; display:block; margin:0 auto 6px;">
+              <div style="font-size:11px; font-weight:600; text-align:center;">{{ params_sig.signature_simple_label }}</div>
+            </label>
+            {% endif %}
+            {% if params_sig.signature_cachet_b64 %}
+            <label class="sig-choix" onclick="choisirSigEnregistree('{{ params_sig.signature_cachet_b64|escapejs }}', 'choix-cachet')">
+              <input type="radio" name="_sig_radio" id="choix-cachet" style="display:none;">
+              <img src="{{ params_sig.signature_cachet_b64 }}" alt="Signature cachet"
+                   style="max-height:52px; max-width:100%; object-fit:contain; display:block; margin:0 auto 6px;">
+              <div style="font-size:11px; font-weight:600; text-align:center;">{{ params_sig.signature_cachet_label }}</div>
+            </label>
+            {% endif %}
+            {% if params_sig.cachet_simple_b64 %}
+            <label class="sig-choix" onclick="choisirSigEnregistree('{{ params_sig.cachet_simple_b64|escapejs }}', 'choix-cachet-simple')">
+              <input type="radio" name="_sig_radio" id="choix-cachet-simple" style="display:none;">
+              <img src="{{ params_sig.cachet_simple_b64 }}" alt="Cachet simple"
+                   style="max-height:52px; max-width:100%; object-fit:contain; display:block; margin:0 auto 6px;">
+              <div style="font-size:11px; font-weight:600; text-align:center;">{{ params_sig.cachet_simple_label }}</div>
+            </label>
+            {% endif %}
+            <!-- Option : dessiner une signature ponctuelle -->
+            <label class="sig-choix" onclick="choisirPad()" id="choix-pad-label">
+              <input type="radio" name="_sig_radio" id="choix-pad" style="display:none;">
+              <div style="height:52px; display:flex; align-items:center; justify-content:center; font-size:22px; color:#ccc;">✍</div>
+              <div style="font-size:11px; font-weight:600; text-align:center; color:var(--text-secondary);">Signer maintenant</div>
+            </label>
+          </div>
+          {% else %}
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+            Aucune signature enregistrée.
+            <a href="{% url 'huissiers:parametres_signatures' %}" style="color:var(--primary);">Configurer mes signatures →</a>
+          </p>
+          {% endif %}
+
+          <!-- Pad ponctuel (visible si "Signer maintenant" ou aucune signature enregistrée) -->
+          <div id="zone-pad-envoi" style="{% if params_sig and params_sig.signature_simple_b64 or params_sig and params_sig.signature_cachet_b64 or params_sig and params_sig.cachet_simple_b64 %}display:none;{% endif %}">
+            <div style="position:relative; border:2px solid var(--border); border-radius:8px; background:#fafafa; overflow:hidden;">
+              <canvas id="sig-canvas" width="620" height="150"
+                      style="display:block; width:100%; touch-action:none; cursor:crosshair;"></canvas>
+              <div id="sig-placeholder" style="position:absolute; inset:0; display:flex; align-items:center;
+                   justify-content:center; pointer-events:none; font-size:14px; color:#ccc;">
+                ✍&nbsp; Signez ici
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="effacerSignature()">✕ Effacer</button>
+              <span id="sig-status" style="font-size:12px; color:var(--text-secondary);">Aucune signature</span>
+            </div>
+          </div>
+
+          <input type="hidden" name="signature_b64" id="sig-b64">
+          <div id="sig-preview-wrap" style="display:none; margin-top:10px; padding:8px 12px; background:#f0fdf4; border:1px solid #a7d7c0; border-radius:6px; display:none; align-items:center; gap:12px;">
+            <img id="sig-preview-img" src="" alt="Aperçu"
+                 style="max-height:40px; max-width:120px; object-fit:contain; background:#fff; padding:2px; border:1px solid #e2e8f0; border-radius:3px;">
+            <span style="font-size:12px; color:#134e3a; font-weight:600;">✓ Signature sélectionnée</span>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="reinitSig()">Changer</button>
+          </div>
+        </div>
+
+        <!-- Récapitulatif -->
+        <div id="recap-envoi" style="display:none; margin-bottom:16px;">
+          <div class="card" style="padding:16px 20px; background:#fffbea; border-color:#fde68a;">
+            <div style="font-size:12px; font-weight:600; color:#92400e; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;">
+              Récapitulatif avant envoi
+            </div>
+            <div style="font-size:13px; color:#78350f; display:flex; flex-direction:column; gap:4px;">
+              <div>✉ <strong id="recap-destinataire">—</strong></div>
+              <div>📄 <span id="recap-fichier">Aucun fichier sélectionné</span></div>
+              <div>↩ <span id="recap-reponse">Réponse non requise</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Boutons -->
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <a href="{% url 'huissiers:significations' %}" class="btn btn-ghost">Annuler</a>
+          <button type="submit" id="btn-envoyer" class="btn btn-primary btn-spinner"
+            data-loading="Envoi en cours…" disabled style="opacity:.5; cursor:not-allowed;">
+            ✉ Envoyer la signification
+          </button>
+        </div>
+
+      </form><!-- /form-envoi -->
+
+    </div><!-- /content-area -->
+  </main>
 </div>
-{% endblock %}
+
 {% block extra_scripts %}
 <script>
-const searchInput = document.getElementById('search-just');
-const resultsDiv = document.getElementById('search-results');
-const uuidField = document.getElementById('just-uuid');
-let timeout;
-if (searchInput) {
-  searchInput.addEventListener('input', function() {
-    clearTimeout(timeout);
-    const q = this.value.trim();
-    if (q.length < 2) { resultsDiv.style.display = 'none'; return; }
-    timeout = setTimeout(() => {
-      fetch('/api/justiciables/rechercher/?q=' + encodeURIComponent(q), {headers: {'X-CSRFToken': getCookie('csrftoken')}})
-        .then(r => r.json())
-        .then(d => {
-          if (!d.resultats.length) { resultsDiv.style.display = 'none'; return; }
-          resultsDiv.innerHTML = d.resultats.map(j =>
-            '<div class="search-item" onclick="selectJust('' + j.uuid + '','' + j.nom.replace(/'/g,"\'") + '','' + j.email + '')">' +
-            '<strong>' + j.nom + '</strong> — ' + j.email + ' | NPI: ' + (j.npi||'-') + ' IFU: ' + (j.ifu||'-') +
-            '</div>').join('');
-          resultsDiv.style.display = 'block';
-        });
-    }, 300);
+'use strict';
+
+var justiciableSelectionne = {% if justiciable %}true{% else %}false{% endif %};
+var fichierSelectionne = false;
+var signatureApposee = false;
+
+/* Activer/désactiver le bouton Envoyer */
+function validerFormulaire() {
+  var btn = document.getElementById('btn-envoyer');
+  var recap = document.getElementById('recap-envoi');
+  if (!btn) return;
+  var ok = justiciableSelectionne && fichierSelectionne && signatureApposee;
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '.5';
+  btn.style.cursor = ok ? 'pointer' : 'not-allowed';
+  if (recap) recap.style.display = ok ? 'block' : 'none';
+}
+
+/* ── Choix d'une signature enregistrée ─────────────────────────────────── */
+function choisirSigEnregistree(b64, radioId) {
+  document.getElementById('sig-b64').value = b64;
+  // Désactiver pad
+  var pad = document.getElementById('zone-pad-envoi');
+  if (pad) pad.style.display = 'none';
+  // Aperçu
+  var wrap = document.getElementById('sig-preview-wrap');
+  var img  = document.getElementById('sig-preview-img');
+  if (wrap && img) { img.src = b64; wrap.style.display = 'flex'; }
+  // Style carte sélectionnée
+  document.querySelectorAll('.sig-choix').forEach(function(el) { el.classList.remove('sig-choix-active'); });
+  var radio = document.getElementById(radioId);
+  if (radio && radio.closest('.sig-choix')) radio.closest('.sig-choix').classList.add('sig-choix-active');
+  signatureApposee = true;
+  validerFormulaire();
+}
+
+/* ── Option "Signer maintenant" ────────────────────────────────────────── */
+function choisirPad() {
+  document.getElementById('sig-b64').value = '';
+  var pad = document.getElementById('zone-pad-envoi');
+  if (pad) pad.style.display = 'block';
+  var wrap = document.getElementById('sig-preview-wrap');
+  if (wrap) wrap.style.display = 'none';
+  document.querySelectorAll('.sig-choix').forEach(function(el) { el.classList.remove('sig-choix-active'); });
+  var lbl = document.getElementById('choix-pad-label');
+  if (lbl) lbl.classList.add('sig-choix-active');
+  signatureApposee = false;
+  validerFormulaire();
+}
+
+function reinitSig() {
+  document.getElementById('sig-b64').value = '';
+  var wrap = document.getElementById('sig-preview-wrap');
+  if (wrap) wrap.style.display = 'none';
+  document.querySelectorAll('.sig-choix').forEach(function(el) { el.classList.remove('sig-choix-active'); });
+  signatureApposee = false;
+  validerFormulaire();
+}
+
+/* ── Pad de signature ───────────────────────────────────────────────────── */
+(function() {
+  var canvas = document.getElementById('sig-canvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var drawing = false;
+  var lastX = 0, lastY = 0;
+  var placeholder = document.getElementById('sig-placeholder');
+  var status = document.getElementById('sig-status');
+  var b64Input = document.getElementById('sig-b64');
+
+  // Ajuster la résolution physique du canvas
+  function resizeCanvas() {
+    var rect = canvas.getBoundingClientRect();
+    var ratio = window.devicePixelRatio || 1;
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    ctx.scale(ratio, ratio);
+    ctx.strokeStyle = '#1a1a3e';
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }
+  resizeCanvas();
+
+  function getPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    var src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  }
+
+  function startDraw(e) {
+    e.preventDefault();
+    drawing = true;
+    var p = getPos(e);
+    lastX = p.x; lastY = p.y;
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    if (placeholder) placeholder.style.display = 'none';
+  }
+  function draw(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    var p = getPos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  }
+  function stopDraw(e) {
+    if (!drawing) return;
+    drawing = false;
+    ctx.closePath();
+    // Exporter en base64 PNG et mettre dans le champ caché
+    var data = canvas.toDataURL('image/png');
+    if (b64Input) b64Input.value = data;
+    signatureApposee = true;
+    if (status) { status.textContent = '✓ Signature enregistrée'; status.style.color = 'var(--primary)'; }
+    validerFormulaire();
+  }
+
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDraw);
+  canvas.addEventListener('mouseleave', stopDraw);
+  canvas.addEventListener('touchstart', startDraw, { passive: false });
+  canvas.addEventListener('touchmove', draw, { passive: false });
+  canvas.addEventListener('touchend', stopDraw);
+})();
+
+function effacerSignature() {
+  var canvas = document.getElementById('sig-canvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  var b64Input = document.getElementById('sig-b64');
+  if (b64Input) b64Input.value = '';
+  var placeholder = document.getElementById('sig-placeholder');
+  if (placeholder) placeholder.style.display = 'flex';
+  var status = document.getElementById('sig-status');
+  if (status) { status.textContent = 'Aucune signature'; status.style.color = 'var(--text-secondary)'; }
+  signatureApposee = false;
+  validerFormulaire();
+}
+
+/* Sélectionner un justiciable depuis la liste serveur */
+function choisirJusticiable(uuid, nom, email, initiales, detail) {
+  /* Mettre à jour le champ caché dans le form POST */
+  var uuidField = document.getElementById('just-uuid');
+  if (uuidField) uuidField.value = uuid;
+
+  /* Remplir la carte sélectionné (textContent, pas innerHTML) */
+  var elAvatar = document.getElementById('just-avatar');
+  var elNom    = document.getElementById('just-nom');
+  var elEmail  = document.getElementById('just-email');
+  var elDetail = document.getElementById('just-detail');
+  if (elAvatar) elAvatar.textContent = initiales.toUpperCase();
+  if (elNom)    elNom.textContent    = nom;
+  if (elEmail)  elEmail.textContent  = email;
+  if (elDetail) elDetail.textContent = detail;
+
+  /* Afficher la carte, masquer la zone recherche */
+  var cardSel  = document.getElementById('just-selectionne');
+  var zoneRech = document.getElementById('zone-recherche');
+  if (cardSel)  cardSel.style.display  = 'block';
+  if (zoneRech) zoneRech.style.display = 'none';
+
+  /* Récap global */
+  var recapDest = document.getElementById('recap-destinataire');
+  if (recapDest) recapDest.textContent = nom + ' — ' + email;
+
+  justiciableSelectionne = true;
+  validerFormulaire();
+
+  /* Scroll vers l'étape 2 */
+  var fichierInput = document.getElementById('fichier_acte');
+  if (fichierInput) fichierInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* Bouton Changer : revenir à la zone de recherche */
+function afficherRecherche() {
+  var cardSel  = document.getElementById('just-selectionne');
+  var zoneRech = document.getElementById('zone-recherche');
+  var uuidField = document.getElementById('just-uuid');
+  if (cardSel)   cardSel.style.display   = 'none';
+  if (zoneRech)  zoneRech.style.display  = 'block';
+  if (uuidField) uuidField.value = '';
+  justiciableSelectionne = false;
+  validerFormulaire();
+  var input = document.getElementById('search-just');
+  if (input) input.focus();
+}
+
+/* Fichier sélectionné */
+function afficherNomFichier(input) {
+  var el    = document.getElementById('nom-fichier');
+  var recap = document.getElementById('recap-fichier');
+  if (input.files && input.files[0]) {
+    var nom    = input.files[0].name;
+    var taille = (input.files[0].size / 1024 / 1024).toFixed(2);
+    if (el) { el.textContent = '📄 ' + nom + ' (' + taille + ' Mo)'; el.style.display = 'block'; }
+    if (recap) recap.textContent = nom + ' (' + taille + ' Mo)';
+    fichierSelectionne = true;
+  } else {
+    if (el) el.style.display = 'none';
+    if (recap) recap.textContent = 'Aucun fichier sélectionné';
+    fichierSelectionne = false;
+  }
+  validerFormulaire();
+}
+
+/* Case à cocher réponse */
+(function() {
+  var cb = document.getElementById('necessite_reponse');
+  var el = document.getElementById('recap-reponse');
+  if (!cb || !el) return;
+  cb.addEventListener('change', function() {
+    el.textContent = this.checked ? 'Réponse formelle requise' : 'Réponse non requise';
   });
-}
-function selectJust(uuid, nom, email) {
-  uuidField.value = uuid;
-  searchInput.value = nom + ' — ' + email;
-  resultsDiv.style.display = 'none';
-}
-function getCookie(n) { let v = null; document.cookie.split(';').forEach(c => { if (c.trim().startsWith(n+'=')) v = decodeURIComponent(c.trim().slice(n.length+1)); }); return v; }
+})();
+
+/* Récap destinataire si justiciable pré-chargé depuis l'URL */
+{% if justiciable %}
+(function() {
+  var el = document.getElementById('recap-destinataire');
+  if (el) el.textContent = '{% if justiciable.prenom %}{{ justiciable.prenom|escapejs }} {% endif %}{{ justiciable.nom|escapejs }} — {{ justiciable.email_domicile|escapejs }}';
+})();
+{% endif %}
+
+validerFormulaire();
 </script>
+
+<style>
+.sig-choix {
+  border: 2px solid var(--border); border-radius: 10px;
+  padding: 12px 10px; cursor: pointer; background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+  display: block;
+}
+.sig-choix:hover { border-color: var(--primary); }
+.sig-choix-active {
+  border-color: var(--primary) !important;
+  background: #f0fdf4;
+  box-shadow: 0 0 0 3px rgba(21,128,61,.12);
+}
+</style>
+{% endblock %}
+
 {% endblock %}

@@ -1,1 +1,40 @@
-{% extends 'base/base.html' %}{% block body_class %}auth-page{% endblock %}{% block body %}<div class="auth-container"><div class="auth-card"><h2 class="auth-title">Modifier le mot de passe</h2><form method="post" novalidate>{% csrf_token %}{% if form.non_field_errors %}<div class="form-error">{% verbatim %}{ form.non_field_errors }{% endverbatim %}</div>{% endif %}{% for field in form %}<div class="form-group"><label class="form-label">{% verbatim %}{ field.label }{% endverbatim %}</label>{% verbatim %}{ field }{% endverbatim %}</div>{% endfor %}<button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="..."><span class="btn-text">Valider</span><span class="btn-loader" style="display:none;"></span></button></form></div></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Modifier le mot de passe{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-logo">
+      {% include 'base/_logo_lg.html' %}
+      <h1 class="auth-title">Modifier le mot de passe</h1>
+    </div>
+    {% if form.non_field_errors %}
+    <div class="form-error" role="alert">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+    {% endif %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_ancien_mdp" class="form-label">Mot de passe actuel *</label>
+        <input type="password" name="ancien_mdp" id="id_ancien_mdp" class="form-input" placeholder="••••••••••" autocomplete="current-password">
+        {% if form.ancien_mdp.errors %}<p class="field-error">{{ form.ancien_mdp.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-group">
+        <label for="id_nouveau_mdp" class="form-label">Nouveau mot de passe *</label>
+        <input type="password" name="nouveau_mdp" id="id_nouveau_mdp" class="form-input" placeholder="10 caractères min." autocomplete="new-password">
+        {% if form.nouveau_mdp.errors %}<p class="field-error">{{ form.nouveau_mdp.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-group">
+        <label for="id_confirmer_mdp" class="form-label">Confirmer *</label>
+        <input type="password" name="confirmer_mdp" id="id_confirmer_mdp" class="form-input" placeholder="Répétez" autocomplete="new-password">
+        {% if form.confirmer_mdp.errors %}<p class="field-error">{{ form.confirmer_mdp.errors.0 }}</p>{% endif %}
+      </div>
+      <button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="Enregistrement…">
+        Changer le mot de passe
+      </button>
+    </form>
+    <div class="auth-links">
+      <a href="javascript:history.back()">← Retour</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

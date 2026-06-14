@@ -6,7 +6,10 @@
 <div class="auth-container">
   <div class="auth-card">
     <div class="auth-logo">
-      <div class="logo-box-lg"></div>
+      <a href="{% url 'home' %}" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); text-decoration:none; margin-bottom:12px; padding:5px 12px; border:1px solid var(--border); border-radius:999px; transition:background .15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
+        &#8592; Accueil
+      </a>
+      {% include 'base/_logo_lg.html' %}
       <h1 class="auth-title">{{ config.nom_plateforme|default:"e-Signification" }}</h1>
       <p class="auth-subtitle">Plateforme de signification électronique</p>
     </div>

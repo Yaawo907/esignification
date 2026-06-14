@@ -1,2 +1,324 @@
 {% extends 'base/base.html' %}
-{% block body_class %}dashboard-page{% endblock %}{% block body %}<div class="auth-container" style="max-width:900px;"><div class="auth-card"><h2>Mes significations</h2><a href="{% url 'justiciables:tableau_de_bord' %}" class="btn btn-ghost">Retour</a></div></div>{% endblock %}
+{% block title %}Mes significations{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar sidebar-justiciable">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div>
+        <div class="logo-name">e-Signification</div>
+        <div class="logo-sub">Espace justiciable</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Mon espace</div>
+      <a href="{% url 'justiciables:tableau_de_bord' %}" class="nav-item spinner-link nav-green">▦ Tableau de bord</a>
+      <a href="{% url 'justiciables:significations' %}" class="nav-item active nav-green">✉ Significations reçues</a>
+      <a href="{% url 'justiciables:profil' %}" class="nav-item spinner-link nav-green">⚙ Mon profil</a>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link nav-green">✉ Messagerie</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar user-avatar-green">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ request.user.profil_justiciable.nom_complet }}</div>
+        <div class="user-role">Justiciable</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <!-- ── Contenu principal ── -->
+  <main class="dashboard-main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Mes significations reçues</h1>
+        <div class="topbar-sub">
+          {{ significations|length }} acte{% if significations|length != 1 %}s{% endif %}
+          {% if statut_filtre and statut_filtre != 'toutes' %}· filtre actif{% endif %}
+        </div>
+      </div>
+    </header>
+
+    <div class="content-area">
+
+      <!-- Alerte : actes en attente -->
+      {% with pending=significations|length %}
+      {% if statut_filtre == 'en_attente' and pending > 0 %}
+      <div class="alert-banner" style="background:#fffbea; border-color:#d97706; color:#854f0b; margin-bottom:16px;">
+        <span>⚠</span>
+        <span>
+          <strong>{{ pending }} acte{% if pending != 1 %}s{% endif %} nécessite{% if pending == 1 %}nt{% endif %} votre attention.</strong>
+          Acceptez ou refusez chaque signification depuis votre email ou depuis cette page.
+        </span>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <!-- ── Filtres ── -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="padding:12px 18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+
+          <form method="get" id="form-filtres" style="display:contents;">
+
+            <!-- Filtres statut -->
+            <div style="display:flex; gap:6px; flex-wrap:wrap; flex:1;">
+              <a href="?statut=en_attente{% if periode %}&periode={{ periode }}{% endif %}"
+                class="btn btn-sm {% if statut_filtre == 'en_attente' or not statut_filtre %}btn-green{% else %}btn-ghost{% endif %}">
+                ⏳ En attente
+              </a>
+              <a href="?statut=acceptee{% if periode %}&periode={{ periode }}{% endif %}"
+                class="btn btn-sm {% if statut_filtre == 'acceptee' %}btn-green{% else %}btn-ghost{% endif %}">
+                ✓ Acceptées
+              </a>
+              <a href="?statut=repondu{% if periode %}&periode={{ periode }}{% endif %}"
+                class="btn btn-sm {% if statut_filtre == 'repondu' %}btn-green{% else %}btn-ghost{% endif %}">
+                ↩ Répondues
+              </a>
+              <a href="?statut=refusee{% if periode %}&periode={{ periode }}{% endif %}"
+                class="btn btn-sm {% if statut_filtre == 'refusee' %}btn-ghost{% else %}btn-ghost{% endif %}"
+                style="{% if statut_filtre == 'refusee' %}color:var(--red);border-color:var(--red);{% endif %}">
+                ✕ Refusées
+              </a>
+              <a href="?statut=toutes{% if periode %}&periode={{ periode }}{% endif %}"
+                class="btn btn-sm {% if statut_filtre == 'toutes' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Toutes
+              </a>
+            </div>
+
+            <!-- Filtre période -->
+            <input type="hidden" name="statut" value="{{ statut_filtre }}">
+            <select name="periode" onchange="document.getElementById('form-filtres').submit()"
+              class="form-input" style="width:auto; padding:6px 10px; font-size:12px;">
+              <option value="" {% if not periode %}selected{% endif %}>Toute la période</option>
+              <option value="mois" {% if periode == 'mois' %}selected{% endif %}>Ce mois</option>
+              <option value="3mois" {% if periode == '3mois' %}selected{% endif %}>3 derniers mois</option>
+            </select>
+
+          </form>
+
+          <!-- Recherche client-side -->
+          <div style="position:relative;">
+            <input type="text" id="search-sig" class="form-input"
+              placeholder="Rechercher…"
+              style="width:190px; padding-left:28px; font-size:12px;" autocomplete="off">
+            <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:12px; pointer-events:none;">⌕</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Tableau ── -->
+      <div class="card">
+        <div class="table-wrap">
+          <table id="table-sig">
+            <thead>
+              <tr>
+                <th>Référence</th>
+                <th>Huissier</th>
+                <th>Date de réception</th>
+                <th>Statut</th>
+                <th>Réponse</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-sig">
+
+              {% for sig in significations %}
+              <tr data-search="{{ sig.reference|lower }} {{ sig.huissier.nom|lower }} {{ sig.huissier.prenom|lower }} {{ sig.huissier.nom_etude|lower }}">
+
+                <!-- Référence -->
+                <td>
+                  <div style="font-family:monospace; font-size:12px; font-weight:600; letter-spacing:.02em; color:var(--text-primary);">
+                    {{ sig.reference }}
+                  </div>
+                  <div class="td-sub">{{ sig.date_envoi|date:"d/m/Y" }}</div>
+                </td>
+
+                <!-- Huissier -->
+                <td>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="
+                      width:30px; height:30px; border-radius:50%;
+                      background:#134e3a; color:#fff;
+                      display:flex; align-items:center; justify-content:center;
+                      font-size:11px; font-weight:600; flex-shrink:0; text-transform:uppercase;">
+                      {{ sig.huissier.prenom|first }}{{ sig.huissier.nom|first }}
+                    </div>
+                    <div>
+                      <div class="td-name">Me {{ sig.huissier.prenom }} {{ sig.huissier.nom }}</div>
+                      <div class="td-sub">{{ sig.huissier.nom_etude }}</div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Date -->
+                <td>
+                  <div style="font-size:13px;">{{ sig.date_envoi|date:"d/m/Y" }}</div>
+                  <div class="td-sub">{{ sig.date_envoi|date:"H:i" }}</div>
+                </td>
+
+                <!-- Statut -->
+                <td>
+                  <span class="badge badge-{{ sig.statut }}">{{ sig.get_statut_display }}</span>
+                  {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
+                    {% if sig.date_acceptation %}
+                    <div class="td-sub" style="margin-top:3px;">
+                      Reçu le {{ sig.date_acceptation|date:"d/m/Y" }}
+                    </div>
+                    {% endif %}
+                  {% endif %}
+                  {% if sig.statut == 'relance_1' or sig.statut == 'relance_2' %}
+                    <div class="td-sub" style="margin-top:3px; color:var(--orange);">
+                      Relance en cours
+                    </div>
+                  {% endif %}
+                </td>
+
+                <!-- Réponse requise -->
+                <td>
+                  {% if sig.necessite_reponse %}
+                    {% if sig.statut == 'repondu' %}
+                      <span class="badge badge-acceptee">✓ Envoyée</span>
+                      {% if sig.reponse.date_envoi_justiciable %}
+                      <div class="td-sub" style="margin-top:3px;">
+                        {{ sig.reponse.date_envoi_justiciable|date:"d/m/Y" }}
+                      </div>
+                      {% endif %}
+                    {% elif sig.statut == 'acceptee' %}
+                      <span class="badge badge-en_attente" style="background:#fffbea; color:#854f0b; border-color:#d97706;">
+                        À envoyer
+                      </span>
+                    {% else %}
+                      <span style="font-size:11px; color:var(--text-light);">—</span>
+                    {% endif %}
+                  {% else %}
+                    <span style="font-size:11px; color:var(--text-light);">Non requise</span>
+                  {% endif %}
+                </td>
+
+                <!-- Actions -->
+                <td style="text-align:right;">
+                  <div style="display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">
+
+                    {% if sig.statut == 'en_attente' or sig.statut == 'relance_1' or sig.statut == 'relance_2' %}
+                      <!-- Actes en attente : rediriger vers email -->
+                      <span style="font-size:11px; color:var(--text-light); line-height:28px;">
+                        Consultez votre email
+                      </span>
+                    {% endif %}
+
+                    {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
+                      <!-- Ouvrir l'acte -->
+                      <a href="{% url 'significations:telecharger_acte' sig.uuid %}"
+                        class="btn btn-xs btn-green spinner-link"
+                        data-loading="Chargement…"
+                        target="_blank"
+                        title="Consulter l'acte de signification">
+                        📄 Ouvrir l'acte
+                      </a>
+
+                      <!-- Certificat -->
+                      {% if sig.certificat %}
+                      <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}"
+                        class="btn btn-xs btn-ghost spinner-link"
+                        data-loading="Téléchargement…"
+                        title="Télécharger le certificat de réception">
+                        🏅 Certificat
+                      </a>
+                      {% endif %}
+                    {% endif %}
+
+                    {% if sig.necessite_reponse and sig.statut == 'acceptee' %}
+                      <!-- Informer l'huissier (réponse à envoyer) -->
+                      <a href="{% url 'justiciables:envoyer_reponse' sig.uuid %}"
+                        class="btn btn-xs btn-primary spinner-link"
+                        title="Envoyer votre réponse à l'huissier">
+                        ↩ Répondre
+                      </a>
+                    {% endif %}
+
+                  </div>
+                </td>
+
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="td-empty">
+                  {% if statut_filtre and statut_filtre != 'toutes' %}
+                    Aucune signification avec ce statut.
+                    <a href="?statut=toutes" style="margin-left:8px;">Voir toutes →</a>
+                  {% else %}
+                    Vous n'avez pas encore reçu de signification.
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Aucun résultat recherche -->
+        <div id="no-search-sig" style="display:none; text-align:center; padding:28px; color:var(--text-light); font-size:13px;">
+          Aucune signification ne correspond à cette recherche.
+        </div>
+
+      </div><!-- /card -->
+
+      <!-- Info domicile électronique -->
+      <div style="margin-top:16px; padding:12px 16px; background:#f0faf5; border:1px solid #a7d7c0; border-radius:8px;
+        display:flex; gap:10px; align-items:flex-start; font-size:12px; color:#134e3a;">
+        <span style="font-size:14px; flex-shrink:0; margin-top:1px;">✓</span>
+        <span>
+          Votre domicile électronique vérifié :
+          <strong>{{ request.user.profil_justiciable.email_domicile }}</strong>.
+          Les actes vous sont notifiés par email à cette adresse. Conservez-y l'accès.
+        </span>
+      </div>
+
+      <!-- Légende statuts -->
+      <div style="margin-top:10px; padding:6px 2px; font-size:11px; color:var(--text-secondary); display:flex; gap:10px; flex-wrap:wrap;">
+        <span class="badge badge-en_attente">En attente</span> Acte reçu, action requise par email&nbsp;
+        <span class="badge badge-acceptee">Acceptée</span> Acte accepté&nbsp;
+        <span class="badge badge-repondu">Réponse envoyée</span>&nbsp;
+        <span class="badge badge-refusee">Refusée</span>&nbsp;
+        <span class="badge badge-relance_1">Relance 1</span>&nbsp;
+        <span class="badge badge-relance_2">Relance 2</span>
+      </div>
+
+    </div><!-- /content-area -->
+  </main>
+</div>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+/* Recherche client-side */
+(function() {
+  var input = document.getElementById('search-sig');
+  var tbody = document.getElementById('tbody-sig');
+  var noResult = document.getElementById('no-search-sig');
+  if (!input || !tbody) return;
+  input.addEventListener('input', function() {
+    var q = this.value.trim().toLowerCase();
+    var rows = tbody.querySelectorAll('tr[data-search]');
+    var visible = 0;
+    rows.forEach(function(row) {
+      var match = !q || row.dataset.search.includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    if (noResult) noResult.style.display = visible === 0 ? 'block' : 'none';
+  });
+})();
+</script>
+{% endblock %}
+
+{% endblock %}
+                                                                                             

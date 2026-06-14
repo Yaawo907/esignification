@@ -1,0 +1,302 @@
+{% extends 'base/base.html' %}
+{% block title %}Mon profil{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar sidebar-justiciable">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div>
+        <div class="logo-name">e-Signification</div>
+        <div class="logo-sub">Espace justiciable</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Mon espace</div>
+      <a href="{% url 'justiciables:tableau_de_bord' %}" class="nav-item spinner-link nav-green">▦ Tableau de bord</a>
+      <a href="{% url 'justiciables:significations' %}" class="nav-item spinner-link nav-green">✉ Significations reçues</a>
+      <a href="{% url 'justiciables:profil' %}" class="nav-item active nav-green">⚙ Mon profil</a>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link nav-green">✉ Messagerie</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar user-avatar-green">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ profil.nom_complet }}</div>
+        <div class="user-role">Justiciable</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <!-- ── Contenu ── -->
+  <main class="dashboard-main">
+
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Mon profil</h1>
+        <div class="topbar-sub">Gérez vos informations de connexion et votre domicile électronique</div>
+      </div>
+    </header>
+
+    <div class="content-area" style="max-width:680px;">
+
+      {% if messages %}
+      {% for msg in messages %}
+      <div class="alert-banner {% if 'success' in msg.tags %}alert-success{% endif %}" style="margin-bottom:16px;">
+        <span>{% if 'success' in msg.tags %}✓{% else %}⚠{% endif %}</span>
+        <span>{{ msg }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      <!-- ── Informations du compte ── -->
+      <div class="card" style="margin-bottom:20px; padding:20px 24px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:16px;">
+          Informations du compte
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 28px;">
+          <div>
+            <div style="font-size:11px; color:var(--text-light); margin-bottom:2px;">
+              {% if profil.type_compte == 'entreprise' %}Raison sociale{% else %}Nom complet{% endif %}
+            </div>
+            <div style="font-size:14px; font-weight:500;">{{ profil.nom_complet }}</div>
+          </div>
+          {% if profil.type_compte != 'entreprise' %}
+          <div>
+            <div style="font-size:11px; color:var(--text-light); margin-bottom:2px;">Prénom</div>
+            <div style="font-size:14px;">{{ profil.prenom|default:"—" }}</div>
+          </div>
+          {% endif %}
+          <div>
+            <div style="font-size:11px; color:var(--text-light); margin-bottom:2px;">Type de compte</div>
+            <div style="font-size:14px;">
+              {% if profil.type_compte == 'entreprise' %}🏢 Entreprise{% else %}👤 Particulier{% endif %}
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light); margin-bottom:2px;">Téléphone</div>
+            <div style="font-size:14px;">{{ profil.telephone|default:"—" }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light); margin-bottom:2px;">
+              {% if profil.type_compte == 'entreprise' %}IFU{% else %}NPI{% endif %}
+            </div>
+            <div style="font-size:14px; font-family:monospace;">
+              {% if profil.type_compte == 'entreprise' %}{{ profil.ifu|default:"—" }}{% else %}{{ profil.npi|default:"—" }}{% endif %}
+            </div>
+          </div>
+          <div style="grid-column:1/-1;">
+            <div style="font-size:11px; color:var(--text-light); margin-bottom:2px;">Adresse</div>
+            <div style="font-size:14px; color:var(--text-secondary);">{{ profil.adresse|default:"—" }}</div>
+          </div>
+        </div>
+        <div style="margin-top:14px; padding:12px 16px; background:#f0fdf4; border:1px solid #a7d7c0; border-radius:6px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+          <div style="font-size:12px; color:#134e3a; display:flex; gap:8px; align-items:center;">
+            <span>ℹ</span>
+            <span>Pour modifier ces informations, soumettez une demande auprès d'un huissier de justice.</span>
+          </div>
+          <a href="{% url 'justiciables:demander_modification' %}" class="btn btn-sm btn-green spinner-link">
+            ✏ Demander une modification
+          </a>
+        </div>
+      </div>
+
+      <!-- ── Changer le mot de passe ── -->
+      <div class="card" style="margin-bottom:20px; padding:20px 24px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:16px;">
+          Changer le mot de passe
+        </div>
+
+        {% if form_mdp.non_field_errors %}
+        <div style="background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:10px 14px; color:#991b1b; font-size:13px; margin-bottom:14px;">
+          {% for err in form_mdp.non_field_errors %}{{ err }}{% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="changer_mdp">
+
+          <div style="display:grid; gap:14px;">
+
+            <div class="form-group">
+              <label class="form-label" for="id_ancien_mdp">Mot de passe actuel *</label>
+              <input type="password" name="ancien_mdp" id="id_ancien_mdp" class="form-input{% if form_mdp.ancien_mdp.errors %} input-error{% endif %}"
+                placeholder="••••••••••" autocomplete="current-password">
+              {% if form_mdp.ancien_mdp.errors %}
+              <div class="form-error">{{ form_mdp.ancien_mdp.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div class="form-group">
+                <label class="form-label" for="id_nouveau_mdp">Nouveau mot de passe *</label>
+                <div style="position:relative;">
+                  <input type="password" name="nouveau_mdp" id="id_nouveau_mdp"
+                    class="form-input{% if form_mdp.nouveau_mdp.errors %} input-error{% endif %}"
+                    placeholder="10 caractères min." autocomplete="new-password"
+                    style="padding-right:38px;">
+                  <button type="button" onclick="toggleMdp('id_nouveau_mdp', this)"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-light);font-size:14px;" title="Afficher/masquer">👁</button>
+                </div>
+                {% if form_mdp.nouveau_mdp.errors %}
+                <div class="form-error">{{ form_mdp.nouveau_mdp.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="id_confirmer_mdp">Confirmer *</label>
+                <input type="password" name="confirmer_mdp" id="id_confirmer_mdp"
+                  class="form-input{% if form_mdp.confirmer_mdp.errors %} input-error{% endif %}"
+                  placeholder="Répétez le mot de passe" autocomplete="new-password">
+                {% if form_mdp.confirmer_mdp.errors %}
+                <div class="form-error">{{ form_mdp.confirmer_mdp.errors.0 }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Indicateur de force -->
+            <div id="force-mdp" style="display:none;">
+              <div style="height:4px; background:#e2e8f0; border-radius:2px; overflow:hidden;">
+                <div id="barre-force" style="height:100%; width:0%; transition:width .3s, background .3s; border-radius:2px;"></div>
+              </div>
+              <div id="label-force" style="font-size:11px; color:var(--text-light); margin-top:4px;"></div>
+            </div>
+
+          </div>
+
+          <div style="margin-top:18px; display:flex; justify-content:flex-end;">
+            <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+              Changer le mot de passe
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── Changer l'email de domicile électronique ── -->
+      <div class="card" style="padding:20px 24px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px;">
+          Domicile électronique
+        </div>
+        <div style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+          Votre domicile électronique est l'adresse à laquelle les actes judiciaires vous sont notifiés. Tout changement doit être confirmé par un lien envoyé sur la <strong>nouvelle adresse</strong>.
+        </div>
+
+        <!-- Email actuel -->
+        <div style="background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:14px 18px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:11px; color:#134e3a; font-weight:600; text-transform:uppercase; letter-spacing:.05em;">Domicile actuel</div>
+            <div style="font-size:15px; font-weight:600; color:#134e3a; margin-top:2px;">{{ profil.email_domicile }}</div>
+          </div>
+          {% if profil.email_domicile_verifie %}
+          <span style="background:#134e3a; color:#fff; border-radius:999px; padding:3px 12px; font-size:11px; font-weight:600;">✓ Vérifié</span>
+          {% else %}
+          <span style="background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; border-radius:999px; padding:3px 12px; font-size:11px; font-weight:600;">⚠ Non vérifié</span>
+          {% endif %}
+        </div>
+
+        {% if succes_email %}
+        <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:14px 18px; color:#134e3a; font-size:13px; display:flex; gap:10px; align-items:flex-start;">
+          <span style="font-size:18px; flex-shrink:0;">✓</span>
+          <div>
+            <strong>Email de confirmation envoyé.</strong><br>
+            Consultez votre nouvelle adresse email et cliquez sur le lien de confirmation. Le lien est valable 24 heures. Votre domicile actuel reste actif jusqu'à la confirmation.
+          </div>
+        </div>
+        {% else %}
+
+        {% if erreur_email %}
+        <div style="background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:10px 14px; color:#991b1b; font-size:13px; margin-bottom:14px;">
+          {{ erreur_email }}
+        </div>
+        {% endif %}
+
+        <form method="post" novalidate id="form-email">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="changer_email">
+
+          <div style="display:grid; grid-template-columns:1fr auto; gap:10px; align-items:flex-end;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" for="nouveau_email">Nouvelle adresse email *</label>
+              <input type="email" name="nouveau_email" id="nouveau_email" class="form-input"
+                placeholder="nouvelle@adresse.bj" autocomplete="email"
+                value="{{ request.POST.nouveau_email|default:'' }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-spinner"
+              data-loading="Envoi du lien…"
+              style="height:42px; padding:0 20px; white-space:nowrap;"
+              onclick="return confirmerChangementEmail()">
+              Envoyer le lien
+            </button>
+          </div>
+
+          <div style="margin-top:10px; font-size:12px; color:var(--text-secondary);">
+            Un lien de confirmation sera envoyé à la <strong>nouvelle adresse</strong>. Votre ancien domicile recevra aussi une notification de sécurité.
+          </div>
+        </form>
+
+        {% endif %}
+      </div>
+
+    </div><!-- /content-area -->
+  </main>
+</div>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+/* Afficher/masquer mot de passe */
+function toggleMdp(inputId, btn) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+/* Indicateur de force du mot de passe */
+(function() {
+  var input = document.getElementById('id_nouveau_mdp');
+  var barre = document.getElementById('barre-force');
+  var label = document.getElementById('label-force');
+  var wrap = document.getElementById('force-mdp');
+  if (!input || !barre || !label || !wrap) return;
+
+  input.addEventListener('input', function() {
+    var v = this.value;
+    if (!v) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    var score = 0;
+    if (v.length >= 10) score++;
+    if (v.length >= 14) score++;
+    if (/[A-Z]/.test(v)) score++;
+    if (/[0-9]/.test(v)) score++;
+    if (/[^A-Za-z0-9]/.test(v)) score++;
+    var pct = Math.min(100, score * 20);
+    var couleur = pct < 40 ? '#dc2626' : pct < 70 ? '#d97706' : '#134e3a';
+    var texte = pct < 40 ? 'Faible' : pct < 70 ? 'Moyen' : pct < 100 ? 'Fort' : 'Très fort';
+    barre.style.width = pct + '%';
+    barre.style.background = couleur;
+    label.style.color = couleur;
+    label.textContent = texte;
+  });
+})();
+
+/* Confirmation avant changement d'email */
+function confirmerChangementEmail() {
+  var val = document.getElementById('nouveau_e                                                                                       mail').value.trim();
+  if (!val) return false;
+  return confirm('Vous allez changer votre domicile électronique vers :\n' + val + '\n\nUn email de confirmation sera envoyé à cette adresse. Continuer ?');
+}
+</script>
+{% endblock %}
+
+{% endblock %}

@@ -1,1 +1,16 @@
-{% extends 'base/base.html' %}{% block body_class %}auth-page{% endblock %}{% block body %}<div class="auth-container"><div class="auth-card"><h2 class="auth-title">Email envoyé</h2><p class="auth-subtitle">Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.</p><p><a href="/connexion/">Retour</a></p></div></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Email de récupération envoyé{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-container">
+  <div class="auth-card" style="text-align:center;">
+    <div style="font-size:48px; margin-bottom:12px;">📧</div>
+    <h1 class="auth-title" style="font-size:22px;">Email de récupération envoyé</h1>
+    <p style="color:var(--text-secondary); font-size:14px; margin:12px 0 20px;">
+      Si un compte existe avec cette adresse, vous recevrez un lien dans quelques minutes.
+      Vérifiez également vos courriers indésirables. Le lien est valable <strong>2 heures</strong>.
+    </p>
+    <a href="{% url 'accounts:connexion' %}" class="btn btn-primary btn-full spinner-link">Retour à la connexion</a>
+  </div>
+</div>
+{% endblock %}

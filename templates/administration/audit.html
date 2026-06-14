@@ -1,1 +1,136 @@
-{% extends 'base/base.html' %}{% block title %}Journal d'audit{% endblock %}{% block body_class %}dashboard-page{% endblock %}{% block body %}<div class="dashboard-layout"><aside class="sidebar sidebar-admin"><div class="sidebar-logo"><div class="logo-box-sm"></div><div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div><nav class="sidebar-nav"><a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a><a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white">✎ Huissiers</a><a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a><a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a><a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a></nav><div class="sidebar-user sidebar-user-dark"><div class="user-avatar">A</div><a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a></div></aside><main class="dashboard-main"><header class="topbar"><h1 class="topbar-title">Journal d'audit</h1></header><div class="content-area"><div class="card"><div class="card-header"><span class="card-title">Journal d'audit</span></div><p class="td-empty" style="padding:24px;">Contenu à venir.</p></div></div></main></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Journal d'audit{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-admin">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Tableau de bord</div>
+      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a>
+      <div class="nav-section">Utilisateurs</div>
+      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link">✎ Huissiers</a>
+      <div class="nav-section">Paramétrage</div>
+      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a>
+      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
+      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white active">🔍 Audit</a>
+      <div class="nav-section" style="margin-top:10px;">Communication</div>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">&#9993; Messagerie</a>
+    </nav>
+    <div class="sidebar-user sidebar-user-dark">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div><div class="user-name" style="color:#fff;">{{ request.user.email }}</div><div class="user-role">Administrateur</div></div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a>
+    </div>
+  </aside>
+
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Journal d'audit</h1>
+        <div class="topbar-sub">{{ activites|length }} entrées — piste immuable</div>
+      </div>
+      <div class="topbar-actions">
+        <div style="position:relative;">
+          <input type="text" id="search-audit" class="form-input" placeholder="Filtrer…"
+            style="width:220px; padding-left:28px; font-size:12px;">
+          <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:12px; pointer-events:none;">⌕</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-area">
+
+      <div class="card" style="margin-bottom:12px; padding:10px 18px; background:#fffbea; border-color:#fde047;">
+        <div style="font-size:12px; color:#854d0e; display:flex; align-items:center; gap:8px;">
+          <span>🔒</span>
+          <span>La piste d'audit est <strong>immuable</strong> — aucune entrée ne peut être modifiée ou supprimée.</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table id="table-audit">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Utilisateur</th>
+                <th>Action</th>
+                <th>Objet</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-audit">
+              {% for a in activites %}
+              <tr data-search="{{ a.action|lower }} {{ a.user_email|lower }} {{ a.objet_type|lower|default:'' }} {{ a.ip_address|default:'' }}">
+                <td>
+                  <div style="font-size:12px; font-family:monospace; white-space:nowrap;">{{ a.date|date:"d/m/Y" }}</div>
+                  <div style="font-size:11px; color:var(--text-light);">{{ a.date|date:"H:i:s" }}</div>
+                </td>
+                <td>
+                  <div style="font-size:13px; font-weight:500;">{{ a.user_email|default:"—" }}</div>
+                </td>
+                <td>
+                  <span style="
+                    display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;
+                    background:{% if 'connexion' in a.action %}#e0f2fe{% elif 'signification' in a.action %}#f0fdf4{% elif 'modification' in a.action %}#fff7ed{% elif 'erreur' in a.action or 'refus' in a.action %}#fef2f2{% else %}#f8fafc{% endif %};
+                    color:{% if 'connexion' in a.action %}#0369a1{% elif 'signification' in a.action %}#134e3a{% elif 'modification' in a.action %}#9a3412{% elif 'erreur' in a.action or 'refus' in a.action %}#991b1b{% else %}#475569{% endif %};">
+                    {{ a.action }}
+                  </span>
+                </td>
+                <td>
+                  {% if a.objet_type %}
+                  <div style="font-size:12px; color:var(--text-secondary);">{{ a.objet_type }}</div>
+                  {% if a.objet_uuid %}<div style="font-size:10px; font-family:monospace; color:var(--text-light);">{{ a.objet_uuid }}</div>{% endif %}
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  <div style="font-size:11px; font-family:monospace; color:var(--text-light);">{{ a.ip_address|default:"—" }}</div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="td-empty">Aucune entrée dans le journal.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div id="no-result-audit" style="display:none; text-align:center; padding:24px; color:var(--text-light); font-size:13px;">
+          Aucune entrée ne correspond à ce filtre.
+        </div>
+      </div>
+
+      <div style="margin-top:8px; font-size:11px; color:var(--text-secondary);">
+        Affichage limité aux 500 dernières entrées.
+      </div>
+
+    </div>
+  </main>
+</div>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+(function() {
+  var input = document.getElementById('search-audit');
+  var tbody = document.getElementById('tbody-audit');
+  var noResult = document.getElementById('no-result-audit');
+  if (!input || !tbody) return;
+  input.addEventListener('input', function() {
+    var q = this.value.trim().toLowerCase();
+    var rows = tbody.querySelectorAll('tr[data-search]');
+    var visible = 0;
+    rows.forEach(function(row) {
+      var match = !q || row.dataset.search.includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    if (noResult) noResult.style.display = visible === 0 ? 'block' : 'none';
+  });
+})();
+</script>
+{% endblock %}
+
+{% endblock %}

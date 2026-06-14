@@ -1,0 +1,150 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}Paramètres — Signatures & Cachets{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Espace huissier</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link">▦ Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link">✉ Significations</a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link">⌕ Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link">+ Inviter</a>
+      <div class="nav-section" style="margin-top:10px;">Étude</div>
+      <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item spinner-link">👥 Mes clercs</a>
+      <a href="{% url 'huissiers:liste_demandes_modification' %}" class="nav-item spinner-link">✏ Demandes modif.</a>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link">✉ Messagerie</a>
+      <div class="nav-section" style="margin-top:10px;">Paramètres</div>
+      <a href="{% url 'huissiers:parametres_signatures' %}" class="nav-item active">🖊 Signatures & Cachets</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div><div class="user-name">{{ huissier.nom_complet }}</div><div class="user-role">{{ huissier.nom_etude }}</div></div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Signatures & Cachets</h1>
+        <p class="topbar-sub">Enregistrez vos 3 tampons pour les utiliser lors des significations</p>
+      </div>
+    </header>
+
+    <div class="content-area" style="max-width:760px;">
+
+      {% if messages %}{% for m in messages %}
+      <div class="alert-banner {% if 'success' in m.tags %}alert-success{% else %}alert-error{% endif %}" style="margin-bottom:14px;">
+        <span>{% if 'success' in m.tags %}✓{% else %}⚠{% endif %}</span><span>{{ m }}</span>
+      </div>
+      {% endfor %}{% endif %}
+
+      <div style="background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:14px 18px; margin-bottom:22px; font-size:13px; color:#134e3a;">
+        <strong>ℹ Comment ça fonctionne :</strong> Dessinez ou importez chaque tampon ci-dessous.
+        Lors d'une signification, vous choisissez lequel apposer. La signature est intégrée dans le certificat officiel.
+      </div>
+
+      <!-- ── 1. Signature simple ── -->
+      {% include 'huissiers/_bloc_signature.html' with titre="Signature simple" sous_titre="Votre paraphe manuscrit seul" action="enregistrer_signature_simple" effacer_action="effacer_signature_simple" champ_b64="sig_simple_b64" champ_label="sig_simple_label" label_actuel=params.signature_simple_label b64_actuel=params.signature_simple_b64 slug="simple" %}
+
+      <!-- ── 2. Signature avec cachet ── -->
+      {% include 'huissiers/_bloc_signature.html' with titre="Signature avec cachet" sous_titre="Paraphe + tampon de l'étude" action="enregistrer_signature_cachet" effacer_action="effacer_signature_cachet" champ_b64="sig_cachet_b64" champ_label="sig_cachet_label" label_actuel=params.signature_cachet_label b64_actuel=params.signature_cachet_b64 slug="cachet" %}
+
+      <!-- ── 3. Cachet simple ── -->
+      {% include 'huissiers/_bloc_signature.html' with titre="Cachet simple" sous_titre="Tampon de l'étude seul, sans signature" action="enregistrer_cachet_simple" effacer_action="effacer_cachet_simple" champ_b64="cachet_simple_b64" champ_label="cachet_simple_label" label_actuel=params.cachet_simple_label b64_actuel=params.cachet_simple_b64 slug="cachet_simple" %}
+
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+/* Initialise un pad de signature pour un slug donné */
+function initPad(slug) {
+  var canvas = document.getElementById('canvas-' + slug);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var drawing = false;
+  var placeholder = document.getElementById('ph-' + slug);
+  var b64Input = document.getElementById('b64-' + slug);
+  var status = document.getElementById('status-' + slug);
+  var btnSave = document.getElementById('btn-save-' + slug);
+
+  function resize() {
+    var rect = canvas.getBoundingClientRect();
+    var r = window.devicePixelRatio || 1;
+    var prev = canvas.toDataURL();
+    canvas.width = rect.width * r;
+    canvas.height = rect.height * r;
+    ctx.scale(r, r);
+    ctx.strokeStyle = '#1a1a3e';
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Restaurer si quelque chose avait été dessiné
+    var img = new Image();
+    img.onload = function() { ctx.drawImage(img, 0, 0, rect.width, rect.height); };
+    img.src = prev;
+  }
+  resize();
+
+  function pos(e) {
+    var rect = canvas.getBoundingClientRect();
+    var src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  }
+  function start(e) {
+    e.preventDefault(); drawing = true;
+    var p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    if (placeholder) placeholder.style.display = 'none';
+  }
+  function move(e) {
+    if (!drawing) return; e.preventDefault();
+    var p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
+  }
+  function stop() {
+    if (!drawing) return; drawing = false; ctx.closePath();
+    var data = canvas.toDataURL('image/png');
+    if (b64Input) b64Input.value = data;
+    if (status) { status.textContent = '✓ Prêt à enregistrer'; status.style.color = 'var(--primary)'; }
+    if (btnSave) btnSave.disabled = false;
+  }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  canvas.addEventListener('mouseup', stop);
+  canvas.addEventListener('mouseleave', stop);
+  canvas.addEventListener('touchstart', start, {passive:false});
+  canvas.addEventListener('touchmove', move, {passive:false});
+  canvas.addEventListener('touchend', stop);
+}
+
+function effacerPad(slug) {
+  var canvas = document.getElementById('canvas-' + slug);
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var rect = canvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  var b64Input = document.getElementById('b64-' + slug);
+  if (b64Input) b64Input.value = '';
+  var ph = document.getElementById('ph-' + slug);
+  if (ph) ph.style.display = 'flex';
+  var status = document.getElementById('status-' + slug);
+  if (status) { status.textContent = 'Pad vide'; status.style.color = 'var(--text-secondary)'; }
+  var btnSave = document.getElementById('btn-save-' + slug);
+  if (btnSave) btnSave.disabled = true;
+}
+
+/* Init tous les pads au chargement */
+['simple','cachet','cachet_simple'].forEach(initPad);
+</script>
+{% endblock %}

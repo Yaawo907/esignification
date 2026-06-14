@@ -103,6 +103,52 @@ class InscriptionJusticiableForm(forms.Form):
     confirmer_mdp = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-input'}), label="Confirmer le mot de passe")
     accepter_cgu = forms.BooleanField(required=True, label="J'accepte les CGU")
 
+    def clean_email_domicile(self):
+        from justiciables.models import ProfilJusticiable
+        email = self.cleaned_data.get('email_domicile', '').strip().lower()
+        if not email:
+            raise forms.ValidationError("L'email de domicile est obligatoire.")
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError(
+                "Un compte existe déjà avec cette adresse email. "
+                "Si vous avez oublié votre mot de passe, utilisez la page de récupération."
+            )
+        if ProfilJusticiable.objects.filter(email_domicile=email).exists():
+            raise forms.ValidationError(
+                "Cette adresse email est déjà enregistrée comme domicile électronique. "
+                "Un justiciable ne peut avoir qu'une seule élection de domicile."
+            )
+        return escape(email)
+
+    def clean_telephone(self):
+        from justiciables.models import ProfilJusticiable
+        tel = self.cleaned_data.get('telephone', '').strip()
+        if not tel:
+            raise forms.ValidationError("Le numéro de téléphone est obligatoire.")
+        if ProfilJusticiable.objects.filter(telephone=tel).exists():
+            raise forms.ValidationError(
+                "Ce numéro de téléphone est déjà associé à un compte justiciable."
+            )
+        return escape(tel)
+
+    def clean_ifu(self):
+        from justiciables.models import ProfilJusticiable
+        ifu = self.cleaned_data.get('ifu', '').strip()
+        if ifu and ProfilJusticiable.objects.filter(ifu=ifu).exists():
+            raise forms.ValidationError(
+                "Ce numéro IFU est déjà associé à un compte justiciable."
+            )
+        return escape(ifu)
+
+    def clean_npi(self):
+        from justiciables.models import ProfilJusticiable
+        npi = self.cleaned_data.get('npi', '').strip()
+        if npi and ProfilJusticiable.objects.filter(npi=npi).exists():
+            raise forms.ValidationError(
+                "Ce numéro NPI est déjà associé à un compte justiciable."
+            )
+        return escape(npi)
+
     def clean(self):
         cleaned = super().clean()
         if cleaned.get('mot_de_passe') != cleaned.get('confirmer_mdp'):

@@ -1,0 +1,111 @@
+{% extends 'base/base.html' %}
+{% block title %}Demandes de modification{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Espace huissier</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link"><span class="nav-icon">&#9638;</span> Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link"><span class="nav-icon">&#10003;</span> Significations</a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link"><span class="nav-icon">&#8981;</span> Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link"><span class="nav-icon">+</span> Inviter</a>
+      <div class="nav-section" style="margin-top:10px;">Étude</div>
+      <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item spinner-link"><span class="nav-icon">&#128101;</span> Mes clercs</a>
+      <a href="{% url 'huissiers:liste_demandes_modification' %}" class="nav-item active">
+        <span class="nav-icon">&#9998;</span> Demandes modif.
+        {% if nb_en_attente %}<span class="nav-badge">{{ nb_en_attente }}</span>{% endif %}
+      </a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div><div class="user-name">{{ request.user.email }}</div></div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">&#9211;</a>
+    </div>
+  </aside>
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Demandes de modification de profil</h1>
+        <p class="topbar-sub">Justiciables souhaitant mettre à jour leurs informations</p>
+      </div>
+    </header>
+    <div class="content-area">
+      {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }}">{{ m }}</div>{% endfor %}{% endif %}
+
+      <!-- Filtres -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-body" style="padding:12px 20px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="?statut=en_attente" class="btn btn-sm {% if statut_filtre == 'en_attente' %}btn-primary{% else %}btn-ghost{% endif %}">
+              En attente {% if nb_en_attente %}<span class="nav-badge" style="background:#c0392b;margin-left:4px;">{{ nb_en_attente }}</span>{% endif %}
+            </a>
+            <a href="?statut=validee" class="btn btn-sm {% if statut_filtre == 'validee' %}btn-green{% else %}btn-ghost{% endif %}">Validées</a>
+            <a href="?statut=refusee" class="btn btn-sm {% if statut_filtre == 'refusee' %}btn-red{% else %}btn-ghost{% endif %}">Refusées</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">
+          {% if statut_filtre == 'en_attente' %}Demandes en attente
+          {% elif statut_filtre == 'validee' %}Demandes validées
+          {% else %}Demandes refusées{% endif %}
+        </span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Justiciable</th>
+                <th>Champs demandés</th>
+                <th>Date</th>
+                <th>Statut</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for d in demandes %}
+            <tr>
+              <td>
+                <div class="td-name">{{ d.justiciable.nom_complet }}</div>
+                <div class="td-sub">{{ d.justiciable.email_domicile }}</div>
+              </td>
+              <td>
+                <div style="font-size:12px;display:flex;flex-wrap:wrap;gap:4px;">
+                  {% if d.nouveau_nom %}<span class="badge badge-en_attente">Nom</span>{% endif %}
+                  {% if d.nouveau_prenom %}<span class="badge badge-en_attente">Prénom</span>{% endif %}
+                  {% if d.nouveau_nom_entreprise %}<span class="badge badge-en_attente">Entreprise</span>{% endif %}
+                  {% if d.nouveau_telephone %}<span class="badge badge-en_attente">Tél.</span>{% endif %}
+                  {% if d.nouveau_ifu %}<span class="badge badge-en_attente">IFU</span>{% endif %}
+                  {% if d.nouveau_npi %}<span class="badge badge-en_attente">NPI</span>{% endif %}
+                  {% if d.nouvelle_adresse %}<span class="badge badge-en_attente">Adresse</span>{% endif %}
+                  {% if d.piece_1_nom %}<span class="badge badge-verified">📎 Pièce(s)</span>{% endif %}
+                </div>
+              </td>
+              <td>
+                <div>{{ d.date_creation|date:"d/m/Y" }}</div>
+                <div class="td-sub">{{ d.date_creation|date:"H:i" }}</div>
+              </td>
+              <td><span class="badge badge-{{ d.statut }}">{{ d.get_statut_display }}</span></td>
+              <td>
+                <a href="{% url 'huissiers:traiter_demande_modification' d.uuid %}"
+                   class="btn btn-xs {% if d.statut == 'en_attente' %}btn-primary{% else %}btn-ghost{% endif %} spinner-link">
+                  {% if d.statut == 'en_attente' %}Traiter{% else %}Voir{% endif %}
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="td-empty">Aucune demande pour ce filtre.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

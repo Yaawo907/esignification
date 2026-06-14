@@ -104,6 +104,8 @@ class TokenActivation(models.Model):
     RECUPERATION_MDP = 'recuperation_mdp'
     CONFIRMATION_EMAIL = 'confirmation_email'
     MFA_CODE = 'mfa_code'
+    CHANGEMENT_EMAIL_DOMICILE = 'changement_email_domicile'
+    ACTIVATION_CLERC = 'activation_clerc'
 
     TYPE_CHOICES = [
         (ACTIVATION_HUISSIER, 'Activation huissier'),
@@ -111,6 +113,8 @@ class TokenActivation(models.Model):
         (RECUPERATION_MDP, 'Récupération mot de passe'),
         (CONFIRMATION_EMAIL, 'Confirmation email'),
         (MFA_CODE, 'Code MFA'),
+        (CHANGEMENT_EMAIL_DOMICILE, 'Changement email domicile'),
+        (ACTIVATION_CLERC, 'Activation clerc'),
     ]
 
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)

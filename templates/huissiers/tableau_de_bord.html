@@ -6,7 +6,7 @@
 <div class="dashboard-layout">
   <aside class="sidebar sidebar-huissier">
     <div class="sidebar-logo">
-      <div class="logo-box-sm"></div>
+      {% include 'base/_logo_sm.html' %}
       <div><div class="logo-name">e-Signification</div><div class="logo-sub">Espace huissier</div></div>
     </div>
     <nav class="sidebar-nav">
@@ -15,6 +15,12 @@
       <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link"><span class="nav-icon">✉</span> Significations <span class="nav-badge">{{ stats.en_attente }}</span></a>
       <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link"><span class="nav-icon">⌕</span> Rechercher</a>
       <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link"><span class="nav-icon">+</span> Inviter</a>
+      <div class="nav-section" style="margin-top:10px;">Étude</div>
+      <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item spinner-link"><span class="nav-icon">👥</span> Mes clercs</a>
+      <a href="{% url 'huissiers:liste_demandes_modification' %}" class="nav-item spinner-link"><span class="nav-icon">✏</span> Demandes modif.{% if nb_demandes_modif %}<span class="nav-badge">{{ nb_demandes_modif }}</span>{% endif %}</a>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link"><span class="nav-icon">✉</span> Messagerie{% if nb_messages_non_lus %}<span class="nav-badge">{{ nb_messages_non_lus }}</span>{% endif %}</a>
+      <div class="nav-section" style="margin-top:10px;">Paramètres</div>
+      <a href="{% url 'huissiers:parametres_signatures' %}" class="nav-item spinner-link"><span class="nav-icon">🖊</span> Signatures & Cachets</a>
     </nav>
     <div class="sidebar-user">
       <div class="user-avatar">{{ request.user.email|first|upper }}</div>
@@ -22,14 +28,74 @@
       <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
     </div>
   </aside>
+
   <main class="dashboard-main">
     <header class="topbar">
       <div><h1 class="topbar-title">Tableau de bord</h1><p class="topbar-sub">Bonjour Me {{ huissier.prenom }}</p></div>
       <div class="topbar-actions">
         <a href="{% url 'significations:envoyer' %}" class="btn btn-primary spinner-link">✉ Nouvelle signification</a>
-        <button class="btn btn-icon notif-btn" id="notif-btn" aria-label="Notifications"><span>🔔</span><span class="notif-dot" id="notif-dot" style="display:none;"></span></button>
+
+        <!-- Cloche notifications -->
+        <div style="position:relative;" id="notif-wrapper">
+          <button class="btn btn-icon" id="notif-btn" aria-label="Notifications"
+                  onclick="toggleNotifPanel(event)"
+                  style="position:relative; font-size:18px; padding:6px 10px;">
+            🔔
+            {% if nb_demandes_modif or nb_messages_non_lus or stats.reponses_non_vues %}
+            <span style="position:absolute; top:4px; right:4px; width:9px; height:9px;
+                         background:#e53e3e; border-radius:50%; border:2px solid #fff; display:block;"></span>
+            {% endif %}
+          </button>
+
+          <div id="notif-panel" style="display:none; position:absolute; right:0; top:calc(100% + 8px);
+               width:300px; background:#fff; border:1px solid var(--border); border-radius:10px;
+               box-shadow:0 8px 24px rgba(0,0,0,.13); z-index:999; overflow:hidden;">
+            <div style="padding:10px 16px; font-size:11px; font-weight:700; color:var(--text-light);
+                        text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid var(--border);">
+              Notifications
+            </div>
+
+            {% if nb_demandes_modif %}
+            <a href="{% url 'huissiers:liste_demandes_modification' %}" class="notif-item spinner-link">
+              <span class="notif-item-icon" style="background:#fef3c7; color:#92400e;">✏</span>
+              <div>
+                <div style="font-size:13px; font-weight:600;">{{ nb_demandes_modif }} demande{{ nb_demandes_modif|pluralize }} de modification</div>
+                <div style="font-size:12px; color:var(--text-secondary);">En attente de votre traitement</div>
+              </div>
+            </a>
+            {% endif %}
+
+            {% if stats.reponses_non_vues %}
+            <a href="{% url 'huissiers:significations' %}" class="notif-item spinner-link">
+              <span class="notif-item-icon" style="background:#ede9fe; color:#5b21b6;">↩</span>
+              <div>
+                <div style="font-size:13px; font-weight:600;">{{ stats.reponses_non_vues }} réponse{{ stats.reponses_non_vues|pluralize }} non vue{{ stats.reponses_non_vues|pluralize }}</div>
+                <div style="font-size:12px; color:var(--text-secondary);">Réponses de justiciables</div>
+              </div>
+            </a>
+            {% endif %}
+
+            {% if nb_messages_non_lus %}
+            <a href="{% url 'messagerie:liste_conversations' %}" class="notif-item spinner-link">
+              <span class="notif-item-icon" style="background:#dcfce7; color:#166534;">✉</span>
+              <div>
+                <div style="font-size:13px; font-weight:600;">{{ nb_messages_non_lus }} message{{ nb_messages_non_lus|pluralize }} non lu{{ nb_messages_non_lus|pluralize }}</div>
+                <div style="font-size:12px; color:var(--text-secondary);">Messagerie sécurisée</div>
+              </div>
+            </a>
+            {% endif %}
+
+            {% if not nb_demandes_modif and not stats.reponses_non_vues and not nb_messages_non_lus %}
+            <div style="padding:22px 16px; text-align:center; font-size:13px; color:var(--text-secondary);">
+              ✓ Aucune notification en attente
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
       </div>
     </header>
+
     <div class="content-area">
       <div class="stats-grid">
         <div class="stat-card"><div class="stat-icon stat-blue">✉</div><div class="stat-val">{{ stats.envoyees }}</div><div class="stat-label">Envoyées</div></div>
@@ -37,6 +103,7 @@
         <div class="stat-card"><div class="stat-icon stat-green">✓</div><div class="stat-val">{{ stats.acceptees }}</div><div class="stat-label">Acceptées</div></div>
         <div class="stat-card"><div class="stat-icon stat-purple">↩</div><div class="stat-val">{{ stats.reponses_non_vues }}</div><div class="stat-label">Réponses</div></div>
       </div>
+
       <div class="card">
         <div class="card-header"><span class="card-title">Significations récentes</span><a href="{% url 'huissiers:significations' %}" class="card-action spinner-link">Voir tout →</a></div>
         <div class="table-wrap">
@@ -45,21 +112,35 @@
             <tbody>
             {% for sig in significations_recentes %}
             <tr>
-              <td><div class="td-name">{{ sig.justiciable.nom_complet }}</div></td>
-              <td>{{ sig.reference }}</td>
-              <td>{{ sig.date_envoi|date:"d/m/Y" }}</td>
-              <td><span class="badge badge-{{ sig.statut }}">{{ sig.get_statut_display }}</span></td>
               <td>
+                <div class="td-name">{{ sig.justiciable.nom_complet }}</div>
+                <div class="td-sub">{{ sig.justiciable.email_domicile }}</div>
+              </td>
+              <td>{{ sig.reference }}</td>
+              <td>
+                <div>{{ sig.date_envoi|date:"d/m/Y" }}</div>
+                <div class="td-sub">{{ sig.date_envoi|date:"H:i" }}</div>
+              </td>
+              <td><span class="badge badge-{{ sig.statut }}">{{ sig.get_statut_display }}</span></td>
+              <td class="td-actions">
+                {% if sig.statut != 'en_attente' %}
+                <a href="{% url 'significations:telecharger_acte' sig.uuid %}" class="btn btn-xs btn-outline spinner-link" data-loading="Téléchargement…" title="Télécharger l'acte">📄 Acte</a>
+                {% endif %}
                 {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
-                <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}" class="btn btn-xs btn-blue spinner-link" data-loading="Téléchargement…">Certificat</a>
+                  {% if sig.certificat %}
+                  <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}" class="btn btn-xs btn-blue spinner-link" data-loading="Téléchargement…" title="Certificat de signification">✓ Certificat</a>
+                  {% endif %}
+                {% endif %}
+                {% if sig.statut == 'repondu' %}
+                <a href="{% url 'significations:voir_reponse' sig.uuid %}" class="btn btn-xs btn-green spinner-link" title="Voir la réponse">↩ Réponse</a>
                 {% endif %}
                 {% if sig.statut == 'non_delivree' or sig.statut == 'relance_2' %}
-                <a href="#" class="btn btn-xs">Constat</a>
+                <a href="{% url 'significations:telecharger_constat' sig.uuid %}" class="btn btn-xs btn-warning spinner-link" data-loading="Téléchargement…" title="Constat de non-délivrance">⚠ Constat</a>
                 {% endif %}
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="td-empty">Aucune signification pour le moment.</td></tr>
+            <tr><td colspan="5" class="td-empty">Aucune signification récente.</td></tr>
             {% endfor %}
             </tbody>
           </table>
@@ -69,20 +150,32 @@
   </main>
 </div>
 {% endblock %}
+
 {% block extra_scripts %}
-<script>
-// Polling notifications AJAX
-function checkNotifs() {
-  fetch('/api/notifications/', {headers: {'X-CSRFToken': getCookie('csrftoken')}})
-    .then(r => r.json())
-    .then(d => {
-      const dot = document.getElementById('notif-dot');
-      if (d.total > 0) { dot.style.display = 'block'; dot.title = d.total + ' notification(s)'; }
-      else dot.style.display = 'none';
-    }).catch(() => {});
+<style>
+.notif-item {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 16px; text-decoration:none; color:var(--text-primary);
+  border-bottom:1px solid var(--border); transition:background .12s;
 }
-checkNotifs();
-setInterval(checkNotifs, 30000);
-function getCookie(n) { let v = null; document.cookie.split(';').forEach(c => { if (c.trim().startsWith(n+'=')) v = decodeURIComponent(c.trim().slice(n.length+1)); }); return v; }
+.notif-item:last-child { border-bottom:none; }
+.notif-item:hover { background:#f5f6fa; }
+.notif-item-icon {
+  width:36px; height:36px; border-radius:8px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:16px;
+}
+</style>
+<script>
+function toggleNotifPanel(e) {
+  e.stopPropagation();
+  var p = document.getElementById('notif-panel');
+  p.style.display = (p.style.display === 'none') ? 'block' : 'none';
+}
+document.addEventListener('click', function(e) {
+  var w = document.getElementById('notif-wrapper');
+  if (w && !w.contains(e.target)) {
+    document.getElementById('notif-panel').style.display = 'none';
+  }
+});
 </script>
 {% endblock %}

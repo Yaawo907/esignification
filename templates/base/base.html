@@ -5,6 +5,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}{{ config.nom_plateforme|default:"e-Signification" }}{% endblock %}</title>
+{% if config.logo_chambre %}
+<link rel="icon" type="image/png" href="{{ config.logo_chambre.url }}">
+<link rel="apple-touch-icon" href="{{ config.logo_chambre.url }}">
+{% else %}
+<link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+{% endif %}
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
 {% block extra_head %}{% endblock %}
 </head>

@@ -1,23 +1,36 @@
 {% extends 'base/base.html' %}
 {% block title %}Configuration{% endblock %}
 {% block body_class %}dashboard-page{% endblock %}
+{% block extra_head %}
+<style>
+.logo-preview-box {
+  width: 150px; height: 100px; border: 2px dashed var(--border);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg-secondary); overflow: hidden;
+}
+.logo-placeholder { color: var(--text-secondary); font-size: 12px; text-align: center; }
+</style>
+{% endblock %}
 {% block body %}
 <div class="dashboard-layout">
   <aside class="sidebar sidebar-admin">
-    <div class="sidebar-logo"><div class="logo-box-sm"></div><div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div>
+    <div class="sidebar-logo">{% include 'base/_logo_sm.html' %}<div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div>
     <nav class="sidebar-nav">
-      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a>
-      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link">✎ Huissiers</a>
-      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white active">⚙ Configuration</a>
-      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
-      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
+      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">&#9638; Vue d'ensemble</a>
+      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link">&#10000; Huissiers</a>
+      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white active">&#9881; Configuration</a>
+      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">&#167; Textes légaux</a>
+      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">&#128269; Audit</a>
+      <div class="nav-section" style="margin-top:10px;">Communication</div>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">&#9993; Messagerie</a>
     </nav>
-    <div class="sidebar-user sidebar-user-dark"><div class="user-avatar">A</div><div><div class="user-name" style="color:#fff;">Administrateur</div></div><a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a></div>
+    <div class="sidebar-user sidebar-user-dark"><div class="user-avatar">A</div><div><div class="user-name" style="color:#fff;">Administrateur</div></div><a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">&#9211;</a></div>
   </aside>
   <main class="dashboard-main">
     <header class="topbar"><h1 class="topbar-title">Configuration de la plateforme</h1></header>
     <div class="content-area">
-      {% if messages %}{% for m in messages %}<div class="alert alert-success">{{ m }}</div>{% endfor %}{% endif %}
+      {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'success' }}">{{ m }}</div>{% endfor %}{% endif %}
+
       <!-- Config générale -->
       <div class="card" style="margin-bottom:20px;">
         <div class="card-header"><span class="card-title">Configuration générale</span></div>
@@ -44,10 +57,66 @@
               <div class="form-group"><label class="form-label">Email de contact</label><input type="email" name="email_contact" class="form-input" value="{{ config.email_contact }}"></div>
             </div>
             <div class="form-group"><label class="form-label">Texte copyright</label><input type="text" name="copyright_texte" class="form-input" value="{{ config.copyright_texte }}"></div>
-            <div style="text-align:right;"><button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…"><span class="btn-text">Enregistrer</span><span class="btn-loader" style="display:none;"></span></button></div>
+            <div style="text-align:right;"><button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement..."><span class="btn-text">Enregistrer</span><span class="btn-loader" style="display:none;"></span></button></div>
           </form>
         </div>
       </div>
+
+      <!-- Logos officiels -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">Logos officiels — Certificats PDF</span></div>
+        <div class="card-body">
+          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
+            Ces logos apparaissent dans l'en-tête de chaque certificat de signification électronique.
+            Format accepté : PNG ou JPEG, taille max 2 Mo. Un fond transparent (PNG) est recommandé.
+          </p>
+          <form method="post" enctype="multipart/form-data" novalidate>{% csrf_token %}
+            <input type="hidden" name="action" value="logos">
+            <div class="form-row" style="align-items:flex-start;gap:32px;">
+              <!-- Logo Pays -->
+              <div class="form-group">
+                <label class="form-label">Armoiries / Logo du Bénin</label>
+                <div class="logo-preview-box" id="preview-pays">
+                  {% if config.logo_pays %}
+                  <img src="{{ config.logo_pays.url }}" alt="Logo pays" style="max-height:80px;max-width:120px;object-fit:contain;">
+                  {% else %}
+                  <span class="logo-placeholder">Aucun logo</span>
+                  {% endif %}
+                </div>
+                <label class="btn btn-ghost btn-sm" style="margin-top:8px;cursor:pointer;display:inline-flex;">
+                  Choisir un fichier
+                  <input type="file" name="logo_pays" accept="image/png,image/jpeg" style="display:none;"
+                         onchange="previewLogo(this,'preview-pays')">
+                </label>
+                {% if config.logo_pays %}<div class="td-sub" style="margin-top:4px;">{{ config.logo_pays.name|cut:'logos/' }}</div>{% endif %}
+              </div>
+              <!-- Logo Chambre -->
+              <div class="form-group">
+                <label class="form-label">Logo — Chambre Nationale des Huissiers de Justice</label>
+                <div class="logo-preview-box" id="preview-chambre">
+                  {% if config.logo_chambre %}
+                  <img src="{{ config.logo_chambre.url }}" alt="Logo chambre" style="max-height:80px;max-width:120px;object-fit:contain;">
+                  {% else %}
+                  <span class="logo-placeholder">Aucun logo</span>
+                  {% endif %}
+                </div>
+                <label class="btn btn-ghost btn-sm" style="margin-top:8px;cursor:pointer;display:inline-flex;">
+                  Choisir un fichier
+                  <input type="file" name="logo_chambre" accept="image/png,image/jpeg" style="display:none;"
+                         onchange="previewLogo(this,'preview-chambre')">
+                </label>
+                {% if config.logo_chambre %}<div class="td-sub" style="margin-top:4px;">{{ config.logo_chambre.name|cut:'logos/' }}</div>{% endif %}
+              </div>
+            </div>
+            <div style="text-align:right;margin-top:12px;">
+              <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement...">
+                <span class="btn-text">Enregistrer les logos</span><span class="btn-loader" style="display:none;"></span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- Config Certigna -->
       <div class="card">
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
@@ -69,7 +138,7 @@
         <div class="card-body" id="certigna-on" {% if not config.certigna_active %}style="display:none;"{% endif %}>
           <form method="post" novalidate>{% csrf_token %}<input type="hidden" name="action" value="certigna">
             <input type="hidden" name="certigna_active" id="certigna_active_field" value="{% if config.certigna_active %}on{% endif %}">
-            <div class="info-box" style="margin-bottom:16px;">ℹ Stratégie lot Merkle : 1 jeton Certigna par jour, quel que soit le volume d'actes.</div>
+            <div class="info-box" style="margin-bottom:16px;">Info : Stratégie lot Merkle — 1 jeton Certigna par jour, quel que soit le volume d'actes.</div>
             <div class="form-row">
               <div class="form-group"><label class="form-label">URL TSA Certigna</label><input type="url" name="certigna_url" class="form-input" value="{{ config.certigna_tsa_url }}"></div>
               <div class="form-group"><label class="form-label">Identifiant</label><input type="text" name="certigna_login" class="form-input" value="{{ config.certigna_login }}"></div>
@@ -79,39 +148,79 @@
               <div class="form-group"><label class="form-label">OID politique TSA</label><input type="text" name="certigna_oid" class="form-input" value="{{ config.certigna_oid }}"></div>
             </div>
             <div class="form-row">
-              <div class="form-group"><label class="form-label">Heure lot quotidien</label><input type="time" name="certigna_heure" class="form-input" value="{{ config.certigna_heure_lot|time:'H:i' }}"></div>
-              <div class="form-group"><label class="form-label">Seuil alerte jetons</label><input type="number" name="seuil_jetons" class="form-input" value="{{ config.certigna_seuil_alerte_jetons }}" min="1"></div>
+              <div class="form-group"><label class="form-label">Heure du lot quotidien</label><input type="time" name="certigna_heure" class="form-input" value="{{ config.certigna_heure_lot|time:'H:i' }}"></div>
+              <div class="form-group"><label class="form-label">Seuil alerte jetons restants</label><input type="number" name="seuil_jetons" class="form-input" value="{{ config.certigna_seuil_alerte_jetons }}" min="1"></div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-              <button type="button" class="btn btn-ghost btn-sm" onclick="testerCertigna()">🔌 Tester la connexion</button>
-              <span id="test-result" style="font-size:12px;color:var(--text-secondary);"></span>
+            <div class="form-row" style="align-items:center;">
+              <div class="form-group"><label class="form-label">Jetons restants (info)</label><input type="text" class="form-input" value="{{ config.certigna_jetons_restants }}" disabled></div>
+              <div class="form-group" style="padding-top:24px;">
+                <button type="button" class="btn btn-ghost btn-spinner" id="btn-tester-certigna" onclick="testerCertigna()" data-loading="Test...">
+                  <span class="btn-text">Tester la connexion</span><span class="btn-loader" style="display:none;"></span>
+                </button>
+                <span id="certigna-test-result" style="margin-left:12px;font-size:13px;"></span>
+              </div>
             </div>
-            <div style="text-align:right;"><button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…"><span class="btn-text">Enregistrer Certigna</span><span class="btn-loader" style="display:none;"></span></button></div>
+            <div style="text-align:right;margin-top:8px;"><button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement..."><span class="btn-text">Enregistrer Certigna</span><span class="btn-loader" style="display:none;"></span></button></div>
           </form>
         </div>
       </div>
-    </div>
+
+    </div><!-- end content-area -->
   </main>
 </div>
 {% endblock %}
 {% block extra_scripts %}
 <script>
 function toggleCertigna(cb) {
-  const on = cb.checked;
-  document.getElementById('certigna-off').style.display = on ? 'none' : 'block';
-  document.getElementById('certigna-on').style.display = on ? 'block' : 'none';
-  document.getElementById('certigna-badge').textContent = on ? 'Activé' : 'Désactivé';
-  document.getElementById('certigna-badge').className = 'badge ' + (on ? 'badge-actif' : 'badge-inactif');
-  document.getElementById('certigna_active_field').value = on ? 'on' : '';
+  document.getElementById('certigna-off').style.display = cb.checked ? 'none' : '';
+  document.getElementById('certigna-on').style.display = cb.checked ? '' : 'none';
+  document.getElementById('certigna_active_field').value = cb.checked ? 'on' : '';
+  document.getElementById('certigna-badge').textContent = cb.checked ? 'Activé' : 'Désactivé';
+  document.getElementById('certigna-badge').className = 'badge ' + (cb.checked ? 'badge-actif' : 'badge-inactif');
+}
+function previewLogo(input, boxId) {
+  const box = document.getElementById(boxId);
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if (!['image/png', 'image/jpeg'].includes(file.type)) {
+    alert('Format non supporté. Utilisez PNG ou JPEG.');
+    input.value = '';
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Le fichier dépasse 2 Mo.');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    box.innerHTML = '<img src="' + e.target.result + '" style="max-height:80px;max-width:120px;object-fit:contain;" alt="Aperçu">';
+  };
+  reader.readAsDataURL(file);
 }
 function testerCertigna() {
-  const r = document.getElementById('test-result');
-  r.textContent = 'Test en cours…';
-  fetch('/api/certigna/tester/', {method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken'), 'Content-Type':'application/json'}})
-    .then(res => res.json())
-    .then(d => { r.innerHTML = d.success ? '<span style="color:#0d6e4f;">✓ ' + d.message + '</span>' : '<span style="color:#a32d2d;">✗ ' + d.message + '</span>'; })
-    .catch(() => { r.textContent = 'Erreur réseau.'; });
+  const btn = document.getElementById('btn-tester-certigna');
+  const res = document.getElementById('certigna-test-result');
+  btn.disabled = true;
+  res.textContent = 'Test en cours...';
+  res.style.color = 'var(--text-secondary)';
+  fetch('/api/certigna/tester/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json'}
+  }).then(r => r.json()).then(d => {
+    res.textContent = d.message;
+    res.style.color = d.success ? 'var(--green)' : 'var(--red)';
+  }).catch(() => {
+    res.textContent = 'Erreur réseau.';
+    res.style.color = 'var(--red)';
+  }).finally(() => { btn.disabled = false; });
 }
-function getCookie(n) { let v = null; document.cookie.split(';').forEach(c => { if (c.trim().startsWith(n+'=')) v = decodeURIComponent(c.trim().slice(n.length+1)); }); return v; }
+function getCookie(n) {
+  let v = null;
+  document.cookie.split(';').forEach(c => {
+    if (c.trim().startsWith(n + '=')) v = decodeURIComponent(c.trim().slice(n.length + 1));
+  });
+  return v;
+}
 </script>
 {% endblock %}

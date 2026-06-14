@@ -1,0 +1,132 @@
+{% extends 'base/base.html' %}
+{% block title %}Réponse — {{ sig.reference }}{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div>
+        <div class="logo-name">e-Signification</div>
+        <div class="logo-sub">Espace huissier</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link">▦ Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item active">✉ Significations</a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link">⌕ Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link">+ Inviter</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ request.user.email }}</div>
+        <div class="user-role">Huissier</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <!-- ── Contenu ── -->
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Réponse du justiciable</h1>
+        <div class="topbar-sub">Signification {{ sig.reference }}</div>
+      </div>
+      <div class="topbar-actions">
+        <a href="{% url 'huissiers:significations' %}" class="btn btn-ghost spinner-link">← Retour</a>
+      </div>
+    </header>
+
+    <div class="content-area" style="max-width:700px;">
+
+      <!-- Récapitulatif signification -->
+      <div class="card" style="margin-bottom:16px; padding:20px 24px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px;">
+          Signification concernée
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 24px;">
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Référence</div>
+            <div style="font-family:monospace; font-size:13px; font-weight:600;">{{ sig.reference }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Justiciable</div>
+            <div style="font-size:13px; font-weight:500;">{{ sig.justiciable.nom_complet }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Date d'envoi</div>
+            <div style="font-size:13px;">{{ sig.date_envoi|date:"d/m/Y H:i" }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Date d'acceptation</div>
+            <div style="font-size:13px;">{{ sig.date_acceptation|date:"d/m/Y H:i"|default:"—" }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Réponse -->
+      <div class="card" style="padding:24px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:16px;">
+          Réponse du justiciable
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 24px; margin-bottom:20px;">
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Date d'envoi de la réponse</div>
+            <div style="font-size:13px;">{{ reponse.date_envoi_justiciable|date:"d/m/Y H:i" }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Réception par l'étude</div>
+            <div style="font-size:13px;">
+              {% if reponse.date_reception_huissier %}
+                {{ reponse.date_reception_huissier|date:"d/m/Y H:i" }}
+              {% else %}
+                Maintenant
+              {% endif %}
+            </div>
+          </div>
+          {% if reponse.hash_reponse %}
+          <div style="grid-column:1/-1;">
+            <div style="font-size:11px; color:var(--text-light);">Empreinte (SHA-256)</div>
+            <div style="font-family:monospace; font-size:11px; color:var(--text-secondary); word-break:break-all;">
+              {{ reponse.hash_reponse }}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Document joint -->
+        {% if fichier_disponible %}
+        <div style="background:#f5f8ff; border:1px solid #d0dff5; border-radius:8px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="font-size:24px;">📄</div>
+            <div>
+              <div style="font-weight:600; font-size:14px;">{{ reponse.nom_fichier_reponse|default:"Document de réponse" }}</div>
+              <div style="font-size:12px; color:var(--text-secondary);">Fichier joint par le justiciable</div>
+            </div>
+          </div>
+          <a href="{% url 'significations:telecharger_reponse' sig.uuid %}"
+            class="btn btn-primary btn-spinner"
+            data-loading="Téléchargement…"
+            title="Télécharger le document de réponse">
+            ⬇ Télécharger
+          </a>
+        </div>
+        {% else %}
+        <div style="background:#f8f8f8; border:1px solid #e8e8e8; border-radius:8px; padding:14px 18px; color:var(--text-secondary); font-size:13px;">
+          Aucun document joint — réponse électronique simple.
+        </div>
+        {% endif %}
+
+      </div>
+
+    </div>
+  </main>
+</div>
+{% endblock %}

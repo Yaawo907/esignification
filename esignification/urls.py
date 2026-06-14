@@ -8,6 +8,7 @@ from django.shortcuts import redirect
 
 def home(request):
     from accounts.models import User
+    from django.shortcuts import render as _render
     if request.user.is_authenticated:
         if request.user.role == User.ADMIN:
             return redirect('/administration/')
@@ -15,11 +16,11 @@ def home(request):
             return redirect('/huissier/')
         elif request.user.role == User.JUSTICIABLE:
             return redirect('/justiciable/')
-    return redirect('/connexion/')
+    return _render(request, 'landing.html')
 
 
 urlpatterns = [
-    path('', home),
+    path('', home, name='home'),
     path('admin/', admin.site.urls),
     path('i18n/', include('django.conf.urls.i18n')),
     path('set-language/', set_language, name='set_language'),
@@ -30,6 +31,7 @@ urlpatterns = [
     path('administration/', include('administration.urls', namespace='administration')),
     path('significations/', include('significations.urls', namespace='significations')),
     path('api/', include('api.urls', namespace='api')),
+    path('messagerie/', include('messagerie.urls', namespace='messagerie')),
 ]
 
 if settings.DEBUG:

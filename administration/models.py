@@ -18,6 +18,12 @@ class ConfigurationPlateforme(models.Model):
     telephone_contact = models.CharField(max_length=20, blank=True)
     adresse_contact = models.TextField(blank=True)
 
+    # Logos officiels (pour les certificats PDF)
+    logo_pays = models.ImageField(upload_to='logos/', null=True, blank=True,
+                                  help_text='Logo/armoiries du pays (PNG/JPG, fond transparent recommandé)')
+    logo_chambre = models.ImageField(upload_to='logos/', null=True, blank=True,
+                                     help_text='Logo de la Chambre Nationale des Huissiers de Justice')
+
     # Certigna
     certigna_active = models.BooleanField(default=False)
     certigna_tsa_url = models.URLField(blank=True, default='https://tsa.certigna.fr/tsa')

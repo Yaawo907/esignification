@@ -1,0 +1,476 @@
+{% extends 'base/base.html' %}
+{% block title %}{{ conv.sujet }}{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+  {% include 'messagerie/_sidebar.html' %}
+
+  <main class="cv-main">
+
+    <!-- ── En-tête ── -->
+    <header class="cv-header">
+      <div class="cv-header-left">
+        <a href="{% url 'messagerie:liste_conversations' %}" class="cv-back" title="Retour messagerie">&#8592;</a>
+        <div class="cv-avatar">{{ autre_nom|first|upper }}</div>
+        <div class="cv-header-info">
+          <div class="cv-header-nom">{{ autre_nom }}</div>
+          <div class="cv-header-sub">
+            <span class="cv-tls">&#128274; AES-256</span>
+            <span class="cv-sujet">{{ conv.sujet }}</span>
+          </div>
+        </div>
+      </div>
+      <form method="post" action="{% url 'messagerie:archiver' conv.uuid %}">{% csrf_token %}
+        <button type="submit" class="btn btn-ghost btn-sm"
+          onclick="return confirm('Archiver cette conversation ?')">&#128230; Archiver</button>
+      </form>
+    </header>
+
+    <!-- ── Zone messages ── -->
+    <div class="cv-messages" id="msg-zone">
+
+      {% if messages_affichage %}
+      <div class="cv-date-sep"><span>{{ messages_affichage.0.obj.date_envoi|date:"d F Y" }}</span></div>
+      {% endif %}
+
+      {% for item in messages_affichage %}
+      <div class="cv-msg {% if item.est_moi %}cv-msg-moi{% else %}cv-msg-autre{% endif %}" data-uuid="{{ item.obj.uuid }}">
+
+        {% if not item.est_moi %}
+        <div class="cv-msg-avatar">{{ autre_nom|first|upper }}</div>
+        {% endif %}
+
+        <div class="cv-msg-body {% if item.est_moi %}cv-msg-body-right{% endif %}">
+          {% if not item.est_moi %}
+          <div class="cv-msg-sender">{{ item.auteur }}</div>
+          {% endif %}
+
+          <div class="cv-bubble">{{ item.contenu }}</div>
+
+          {% if item.pieces %}
+          <div class="cv-pj-list">
+            {% for pj in item.pieces %}
+            <a href="{% url 'messagerie:telecharger_pj' pj.uuid %}" class="cv-pj-chip" title="Télécharger {{ pj.nom_fichier }}">
+              &#128206; {{ pj.nom_fichier }}
+              <span class="cv-pj-size">{{ pj.taille_lisible }}</span>
+            </a>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="cv-msg-time {% if item.est_moi %}cv-msg-time-right{% endif %}">
+            {{ item.obj.date_envoi|date:"d/m/Y H:i" }}
+            {% if item.est_moi %}
+              <span class="cv-lu" title="{% if item.obj.lu %}Lu{% else %}Envoyé{% endif %}">
+                {% if item.obj.lu %}&#10003;&#10003;{% else %}&#10003;{% endif %}
+              </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="cv-empty">
+        <div style="font-size:42px; margin-bottom:10px; opacity:.3;">&#128172;</div>
+        <div style="font-weight:500;">Démarrez la conversation</div>
+        <div style="font-size:12px; margin-top:4px; color:var(--text-secondary);">Les messages sont chiffrés de bout en bout (AES-256)</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- ── Zone de composition style Gmail ── -->
+    <div class="cv-compose">
+      <!-- Prévisualisation pièces jointes -->
+      <div id="pj-preview" style="display:none;">
+        <div class="cv-pj-preview-label">Pièces jointes à envoyer</div>
+        <div id="pj-list" class="cv-pj-preview-list"></div>
+        <div class="cv-pj-sep"></div>
+      </div>
+
+      <form id="form-message" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- Grande zone de texte -->
+        <textarea id="msg-input" name="contenu"
+          class="cv-textarea"
+          placeholder="Rédigez votre message…"
+          maxlength="5000"></textarea>
+
+        <!-- Barre d'outils inférieure -->
+        <div class="cv-toolbar">
+          <div class="cv-toolbar-left">
+            <!-- Envoyer -->
+            <button type="button" id="btn-envoyer" class="cv-btn-send" onclick="envoyerMessage()">
+              <span id="btn-label">Envoyer</span>
+              <span id="btn-spinner" class="cv-spinner" style="display:none;"></span>
+              <span class="cv-send-hint">Ctrl+Entrée</span>
+            </button>
+
+            <!-- Pièce jointe -->
+            <label class="cv-btn-attach" title="Joindre un fichier (PDF, JPG, PNG, DOC — max 10 Mo)">
+              &#128206;
+              <input type="file" id="pj-input" name="pieces_jointes" multiple
+                     accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none;"
+                     onchange="previewPJ(this)">
+            </label>
+          </div>
+
+          <div class="cv-toolbar-right">
+            <span id="char-count" class="cv-charcount">0 / 5000</span>
+            <span class="cv-tls-mini">&#128274; Chiffré</span>
+          </div>
+        </div>
+      </form>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+const CONV_UUID        = '{{ conv.uuid }}';
+const ENVOYER_URL      = '{% url "messagerie:envoyer_message" conv.uuid %}';
+const POLLING_URL      = '{% url "messagerie:nouveaux_messages" conv.uuid %}';
+const AUTRE_NOM        = '{{ autre_nom|escapejs }}';
+const AUTRE_INITIAL    = '{{ autre_nom|first|upper|escapejs }}';
+const TELECHARGER_BASE = '{% url "messagerie:telecharger_pj" "00000000-0000-0000-0000-000000000000" %}'.replace('00000000-0000-0000-0000-000000000000', '');
+let dernierTimestamp   = new Date().toISOString();
+let pollingTimer       = null;
+
+/* Scroll bas */
+function scrollBas(smooth) {
+  const z = document.getElementById('msg-zone');
+  z.scrollTo({ top: z.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+}
+scrollBas(false);
+
+/* Auto-resize textarea */
+const textarea = document.getElementById('msg-input');
+textarea.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 260) + 'px';
+  document.getElementById('char-count').textContent = this.value.length + ' / 5000';
+  syncSendBtn();
+});
+
+function syncSendBtn() {
+  const hasContent = textarea.value.trim().length > 0
+    || (document.getElementById('pj-input').files.length > 0);
+  document.getElementById('btn-envoyer').disabled = !hasContent;
+  document.getElementById('btn-envoyer').style.opacity = hasContent ? '1' : '0.5';
+}
+
+/* Ctrl+Entrée */
+textarea.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); envoyerMessage(); }
+});
+
+/* Prévisualisation PJ */
+function previewPJ(input) {
+  const list = document.getElementById('pj-list');
+  const zone = document.getElementById('pj-preview');
+  list.innerHTML = '';
+  if (!input.files.length) { zone.style.display = 'none'; syncSendBtn(); return; }
+  let ok = true;
+  Array.from(input.files).forEach(function(f) {
+    if (f.size > 10 * 1024 * 1024) { alert(f.name + ' dépasse 10 Mo.'); ok = false; return; }
+    const chip = document.createElement('span');
+    chip.className = 'cv-pj-chip cv-pj-chip-draft';
+    chip.innerHTML = '&#128206; ' + escHtml(f.name)
+      + ' <span class="cv-pj-size">(' + (f.size/1024).toFixed(0) + ' Ko)</span>'
+      + ' <span class="cv-pj-del" onclick="retirerPJ(this, \'' + escHtml(f.name) + '\')">&#10005;</span>';
+    list.appendChild(chip);
+  });
+  if (!ok) { input.value = ''; list.innerHTML = ''; zone.style.display = 'none'; }
+  else zone.style.display = '';
+  syncSendBtn();
+}
+
+function retirerPJ(btn) {
+  btn.parentElement.remove();
+  if (!document.getElementById('pj-list').children.length) {
+    document.getElementById('pj-preview').style.display = 'none';
+    document.getElementById('pj-input').value = '';
+  }
+  syncSendBtn();
+}
+
+/* Envoi AJAX */
+async function envoyerMessage() {
+  const btn     = document.getElementById('btn-envoyer');
+  const contenu = textarea.value.trim();
+  const pjInput = document.getElementById('pj-input');
+  if (!contenu && !pjInput.files.length) return;
+
+  btn.disabled = true;
+  document.getElementById('btn-label').style.display = 'none';
+  document.getElementById('btn-spinner').style.display = 'inline-block';
+
+  const fd = new FormData(document.getElementById('form-message'));
+  fd.set('contenu', contenu);
+
+  try {
+    const r = await fetch(ENVOYER_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd,
+    });
+    const d = await r.json();
+    if (d.success) {
+      ajouterBulle(d.message, true);
+      textarea.value = '';
+      textarea.style.height = 'auto';
+      pjInput.value = '';
+      document.getElementById('pj-preview').style.display = 'none';
+      document.getElementById('pj-list').innerHTML = '';
+      document.getElementById('char-count').textContent = '0 / 5000';
+      dernierTimestamp = new Date().toISOString();
+    } else {
+      alert(d.error || 'Erreur lors de l\'envoi.');
+    }
+  } catch(e) {
+    alert('Erreur réseau.');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('btn-label').style.display = '';
+    document.getElementById('btn-spinner').style.display = 'none';
+    syncSendBtn();
+  }
+}
+
+/* Créer une bulle */
+function ajouterBulle(msg, estMoi) {
+  const zone  = document.getElementById('msg-zone');
+  const empty = zone.querySelector('.cv-empty');
+  if (empty) empty.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'cv-msg ' + (estMoi ? 'cv-msg-moi' : 'cv-msg-autre');
+  wrap.dataset.uuid = msg.uuid;
+
+  const avatar = estMoi ? '' : '<div class="cv-msg-avatar">' + AUTRE_INITIAL + '</div>';
+  const sender = estMoi ? '' : '<div class="cv-msg-sender">' + escHtml(AUTRE_NOM) + '</div>';
+  const lu     = estMoi ? '<span class="cv-lu">&#10003;</span>' : '';
+
+  let pjHtml = '';
+  if (msg.pieces && msg.pieces.length) {
+    pjHtml = '<div class="cv-pj-list">';
+    msg.pieces.forEach(function(p) {
+      pjHtml += '<a href="' + TELECHARGER_BASE + p.uuid + '/" class="cv-pj-chip">&#128206; '
+        + escHtml(p.nom) + '<span class="cv-pj-size">' + escHtml(p.taille) + '</span></a>';
+    });
+    pjHtml += '</div>';
+  }
+
+  wrap.innerHTML = avatar
+    + '<div class="cv-msg-body' + (estMoi ? ' cv-msg-body-right' : '') + '">'
+    + sender
+    + '<div class="cv-bubble">' + escHtml(msg.contenu) + '</div>'
+    + pjHtml
+    + '<div class="cv-msg-time' + (estMoi ? ' cv-msg-time-right' : '') + '">'
+    + escHtml(msg.date) + lu + '</div></div>';
+
+  zone.appendChild(wrap);
+  scrollBas(true);
+}
+
+/* Polling 5s */
+async function pollNouveaux() {
+  try {
+    const r = await fetch(POLLING_URL + '?depuis=' + encodeURIComponent(dernierTimestamp),
+      { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const d = await r.json();
+    if (d.messages && d.messages.length) {
+      d.messages.forEach(function(msg) {
+        if (!document.querySelector('[data-uuid="' + msg.uuid + '"]'))
+          ajouterBulle(msg, msg.est_moi);
+      });
+      dernierTimestamp = d.timestamp;
+    }
+  } catch(e) {}
+}
+pollingTimer = setInterval(pollNouveaux, 5000);
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) clearInterval(pollingTimer);
+  else pollingTimer = setInterval(pollNouveaux, 5000);
+});
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function getCookie(n) {
+  let v = null;
+  document.cookie.split(';').forEach(function(c) {
+    if (c.trim().startsWith(n + '=')) v = decodeURIComponent(c.trim().slice(n.length+1));
+  });
+  return v;
+}
+</script>
+
+<style>
+/* ── Layout principal ── */
+.cv-main {
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  flex: 1; min-width: 0;
+}
+
+/* ── En-tête ── */
+.cv-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px; background: #fff;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,.06); flex-shrink: 0; gap: 12px;
+}
+.cv-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cv-back {
+  font-size: 20px; color: var(--text-secondary); text-decoration: none;
+  padding: 4px 8px; border-radius: 6px; transition: background .15s;
+}
+.cv-back:hover { background: var(--bg-secondary); color: var(--primary); }
+.cv-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; flex-shrink: 0;
+}
+.cv-header-info { min-width: 0; }
+.cv-header-nom { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.cv-header-sub { display: flex; align-items: center; gap: 8px; margin-top: 1px; }
+.cv-tls {
+  font-size: 10px; font-weight: 600; color: #134e3a;
+  background: #f0fdf4; border: 1px solid #a7d7c0;
+  border-radius: 999px; padding: 1px 7px;
+}
+.cv-sujet { font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Zone messages ── */
+.cv-messages {
+  flex: 1; overflow-y: auto; padding: 24px 32px;
+  display: flex; flex-direction: column; gap: 6px;
+  background: #f5f6fa;
+}
+
+/* Séparateur date */
+.cv-date-sep {
+  display: flex; align-items: center; justify-content: center; margin: 10px 0;
+}
+.cv-date-sep span {
+  font-size: 11px; color: var(--text-secondary);
+  background: #e4e6eb; border-radius: 999px; padding: 2px 14px; font-weight: 500;
+}
+
+/* Bulles */
+.cv-msg { display: flex; align-items: flex-end; gap: 8px; max-width: 68%; margin-bottom: 4px; }
+.cv-msg-moi   { align-self: flex-end;   flex-direction: row-reverse; }
+.cv-msg-autre { align-self: flex-start; }
+
+.cv-msg-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: #6c757d; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; margin-bottom: 2px;
+}
+.cv-msg-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cv-msg-body-right { align-items: flex-end; }
+.cv-msg-sender { font-size: 11px; font-weight: 600; color: var(--text-secondary); padding-left: 3px; }
+
+.cv-bubble {
+  padding: 10px 15px; border-radius: 18px;
+  font-size: 13.5px; line-height: 1.6; word-break: break-word; white-space: pre-wrap;
+}
+.cv-msg-moi  .cv-bubble { background: var(--primary); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.cv-msg-autre .cv-bubble { background: #fff; color: var(--text-primary); border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+
+.cv-msg-time { font-size: 10px; color: var(--text-secondary); padding: 1px 4px; display: flex; align-items: center; gap: 4px; }
+.cv-msg-time-right { justify-content: flex-end; }
+.cv-lu { font-size: 11px; color: var(--primary); }
+
+/* PJ dans bulle */
+.cv-pj-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.cv-pj-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 8px; font-size: 11px;
+  text-decoration: none; border: 1px solid rgba(0,0,0,.1);
+  cursor: pointer; transition: background .15s;
+}
+.cv-msg-moi  .cv-pj-chip { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.28); }
+.cv-msg-moi  .cv-pj-chip:hover { background: rgba(255,255,255,.3); }
+.cv-msg-autre .cv-pj-chip { background: #f3f4f6; color: var(--primary); border-color: #e2e8f0; }
+.cv-msg-autre .cv-pj-chip:hover { background: #e8f5ee; }
+.cv-pj-size { opacity: .65; font-size: 10px; }
+.cv-pj-del  { opacity: .55; cursor: pointer; margin-left: 3px; }
+.cv-pj-del:hover { opacity: 1; }
+
+/* Zone vide */
+.cv-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 13px; text-align: center; padding: 40px; }
+
+/* ── Zone composition Gmail ── */
+.cv-compose {
+  background: #fff;
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 8px rgba(0,0,0,.06);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+/* Prévisualisation PJ */
+#pj-preview { padding: 10px 20px 0; }
+.cv-pj-preview-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.cv-pj-preview-list  { display: flex; flex-wrap: wrap; gap: 6px; }
+.cv-pj-sep { border-top: 1px solid var(--border-light); margin-top: 10px; }
+.cv-pj-chip-draft { background: #f3f4f6; color: var(--text-primary); border: 1px solid #e2e8f0; }
+
+/* Textarea principale */
+.cv-textarea {
+  width: 100%; box-sizing: border-box;
+  border: none; outline: none; resize: none;
+  padding: 16px 24px 8px;
+  font-size: 14px; line-height: 1.65; font-family: inherit;
+  color: var(--text-primary); background: #fff;
+  min-height: 90px; max-height: 260px;
+  overflow-y: auto;
+}
+.cv-textarea::placeholder { color: #b0b7c3; }
+
+/* Barre d'outils basse */
+.cv-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px 12px; gap: 12px;
+}
+.cv-toolbar-left  { display: flex; align-items: center; gap: 8px; }
+.cv-toolbar-right { display: flex; align-items: center; gap: 12px; }
+
+.cv-btn-send {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--primary); color: #fff; border: none;
+  border-radius: 6px; padding: 8px 20px;
+  font-size: 13.5px; font-weight: 600; cursor: pointer;
+  transition: background .15s, opacity .15s; opacity: .5;
+}
+.cv-btn-send:not(:disabled) { opacity: 1; }
+.cv-btn-send:not(:disabled):hover { background: #0d5c3e; }
+.cv-btn-send:disabled { cursor: default; }
+.cv-send-hint { font-size: 10px; opacity: .65; font-weight: 400; }
+
+.cv-btn-attach {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 18px; color: var(--text-secondary);
+  background: none; transition: background .15s, color .15s;
+}
+.cv-btn-attach:hover { background: #f0f0f0; color: var(--primary); }
+
+.cv-charcount { font-size: 11px; color: var(--text-secondary); }
+.cv-tls-mini  { font-size: 10px; color: #a7c4b5; }
+
+.cv-spinner {
+  width: 13px; height: 13px;
+  border: 2px solid rgba(255,255,255,.35);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}

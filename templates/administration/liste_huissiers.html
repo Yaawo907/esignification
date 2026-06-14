@@ -1,1 +1,386 @@
-{% extends 'base/base.html' %}{% block title %}Liste des huissiers{% endblock %}{% block body_class %}dashboard-page{% endblock %}{% block body %}<div class="dashboard-layout"><aside class="sidebar sidebar-admin"><div class="sidebar-logo"><div class="logo-box-sm"></div><div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div><nav class="sidebar-nav"><a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a><a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white">✎ Huissiers</a><a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a><a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a><a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a></nav><div class="sidebar-user sidebar-user-dark"><div class="user-avatar">A</div><a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a></div></aside><main class="dashboard-main"><header class="topbar"><h1 class="topbar-title">Liste des huissiers</h1></header><div class="content-area"><div class="card"><div class="card-header"><span class="card-title">Liste des huissiers</span></div><p class="td-empty" style="padding:24px;">Contenu à venir.</p></div></div></main></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Huissiers — Administration{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar sidebar-admin">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div>
+        <div class="logo-name">e-Signification</div>
+        <div class="logo-sub">Administration</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Tableau de bord</div>
+      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a>
+      <div class="nav-section">Utilisateurs</div>
+      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white active">✎ Huissiers
+        {% if total_attente %}<span class="nav-badge-green">{{ total_attente }}</span>{% endif %}
+      </a>
+      <div class="nav-section">Paramétrage</div>
+      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a>
+      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
+      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
+      <div class="nav-section" style="margin-top:10px;">Communication</div>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">&#9993; Messagerie</a>#9993; Messagerie</a>
+    </nav>
+    <div class="sidebar-user sidebar-user-dark">
+      <div class="user-avatar">A</div>
+      <div>
+        <div class="user-name">{{ request.user.get_full_name|default:"Administrateur" }}</div>
+        <div class="user-role">Super admin</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <!-- ── Contenu principal ── -->
+  <main class="dashboard-main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Huissiers</h1>
+        <div class="topbar-sub">{{ total_all }} huissier{% if total_all != 1 %}s{% endif %} enregistré{% if total_all != 1 %}s{% endif %}</div>
+      </div>
+      <div class="topbar-actions">
+        <a href="{% url 'administration:creer_huissier' %}" class="btn btn-primary spinner-link">
+          + Inviter un huissier
+        </a>
+      </div>
+    </header>
+
+    <div class="content-area">
+
+      <!-- Mini-stats cliquables -->
+      <div style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap;">
+        <a href="?" class="stat-card stat-card-link {% if not statut_filtre %}stat-card-active{% endif %}" style="min-width:130px; text-decoration:none;">
+          <div class="stat-icon stat-blue">▦</div>
+          <div class="stat-val">{{ total_all }}</div>
+          <div class="stat-label">Tous</div>
+        </a>
+        <a href="?statut=actif" class="stat-card stat-card-link {% if statut_filtre == 'actif' %}stat-card-active{% endif %}" style="min-width:130px; text-decoration:none;">
+          <div class="stat-icon stat-green">●</div>
+          <div class="stat-val">{{ total_actif }}</div>
+          <div class="stat-label">Actifs</div>
+        </a>
+        <a href="?statut=inactif" class="stat-card stat-card-link {% if statut_filtre == 'inactif' %}stat-card-active{% endif %}" style="min-width:130px; text-decoration:none;">
+          <div class="stat-icon stat-red">●</div>
+          <div class="stat-val">{{ total_inactif }}</div>
+          <div class="stat-label">Inactifs</div>
+        </a>
+        <a href="?statut=en_attente" class="stat-card stat-card-link {% if statut_filtre == 'en_attente' %}stat-card-active{% endif %}" style="min-width:130px; text-decoration:none;">
+          <div class="stat-icon stat-orange">⏳</div>
+          <div class="stat-val">{{ total_attente }}</div>
+          <div class="stat-label">En attente</div>
+        </a>
+      </div>
+
+      <!-- Alerte huissiers en attente -->
+      {% if total_attente and not statut_filtre %}
+      <div class="alert-banner" style="margin-bottom:16px;">
+        <span>⚠</span>
+        <span><strong>{{ total_attente }}</strong> huissier{% if total_attente != 1 %}s{% endif %} en attente d'activation.</span>
+        <a href="?statut=en_attente" class="btn btn-sm btn-orange">Voir →</a>
+      </div>
+      {% endif %}
+
+      <!-- Tableau des huissiers -->
+      <div class="card">
+        <div class="card-header" style="gap:12px; flex-wrap:wrap;">
+          <span class="card-title">
+            {% if statut_filtre == 'actif' %}Huissiers actifs
+            {% elif statut_filtre == 'inactif' %}Huissiers inactifs
+            {% elif statut_filtre == 'en_attente' %}En attente d'activation
+            {% else %}Tous les huissiers{% endif %}
+          </span>
+          <!-- Barre de recherche client-side -->
+          <div style="position:relative; margin-left:auto;">
+            <input type="text" id="search-huissier" class="form-input" placeholder="Rechercher nom, email, étude, IFU…"
+              style="width:260px; padding-left:32px;" autocomplete="off">
+            <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-light); pointer-events:none;">🔍</span>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table id="table-huissiers">
+            <thead>
+              <tr>
+                <th>Huissier</th>
+                <th>Étude</th>
+                <th>IFU / NPI</th>
+                <th>Téléphone</th>
+                <th>Statut</th>
+                <th>Inscrit le</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-huissiers">
+              {% for h in huissiers %}
+              <tr id="row-{{ h.uuid }}" data-search="{{ h.nom|lower }} {{ h.prenom|lower }} {{ h.user.email|lower }} {{ h.nom_etude|lower }} {{ h.ifu|lower }} {{ h.npi|lower }}">
+                <td>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="user-avatar" style="background:var(--primary); color:#fff; font-size:13px; flex-shrink:0;">
+                      {{ h.prenom|slice:":1" }}{{ h.nom|slice:":1" }}
+                    </div>
+                    <div>
+                      <div class="td-name">Me {{ h.prenom }} {{ h.nom }}</div>
+                      <div class="td-sub">{{ h.user.email }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>{{ h.nom_etude|default:"—" }}</td>
+                <td>
+                  {% if h.ifu %}<div class="td-sub" style="font-size:12px;"><strong>IFU</strong> {{ h.ifu }}</div>{% endif %}
+                  {% if h.npi %}<div class="td-sub" style="font-size:12px;"><strong>NPI</strong> {{ h.npi }}</div>{% endif %}
+                  {% if not h.ifu and not h.npi %}—{% endif %}
+                </td>
+                <td>{{ h.telephone|default:"—" }}</td>
+                <td>
+                  <span id="badge-{{ h.uuid }}" class="badge badge-{{ h.statut }}">
+                    {{ h.get_statut_display }}
+                  </span>
+                </td>
+                <td>{{ h.date_creation|date:"d/m/Y" }}</td>
+                <td style="text-align:right;">
+                  <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;" id="actions-{{ h.uuid }}">
+
+                    {% if h.statut == 'en_attente' %}
+                    <!-- Renvoyer l'invitation -->
+                    <button class="btn btn-sm btn-blue btn-renvoyer"
+                      data-url="{% url 'administration:renvoyer_invitation' h.uuid %}"
+                      data-uuid="{{ h.uuid }}"
+                      title="Renvoyer l'email d'activation">
+                      ✉ Renvoyer
+                    </button>
+                    {% endif %}
+
+                    {% if h.statut == 'actif' %}
+                    <button class="btn btn-xs btn-red btn-toggle-statut"
+                      data-url="{% url 'administration:statut_huissier' h.uuid %}"
+                      data-uuid="{{ h.uuid }}"
+                      data-statut="inactif"
+                      data-nom="Me {{ h.prenom }} {{ h.nom }}">
+                      Désactiver
+                    </button>
+                    {% elif h.statut == 'inactif' %}
+                    <button class="btn btn-xs btn-green btn-toggle-statut"
+                      data-url="{% url 'administration:statut_huissier' h.uuid %}"
+                      data-uuid="{{ h.uuid }}"
+                      data-statut="actif"
+                      data-nom="Me {{ h.prenom }} {{ h.nom }}">
+                      Activer
+                    </button>
+                    {% endif %}
+
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr id="empty-row">
+                <td colspan="7" class="td-empty">
+                  {% if statut_filtre %}
+                    Aucun huissier avec le statut « {{ statut_filtre }} ».
+                    <a href="?" style="margin-left:8px;">Voir tous →</a>
+                  {% else %}
+                    Aucun huissier enregistré pour le moment.
+                    <a href="{% url 'administration:creer_huissier' %}" style="margin-left:8px;">Inviter le premier →</a>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Message "aucun résultat" pour la recherche -->
+        <div id="no-search-result" style="display:none; text-align:center; padding:28px; color:var(--text-light); font-size:13px;">
+          Aucun résultat pour cette recherche.
+        </div>
+
+      </div><!-- /card -->
+
+    </div><!-- /content-area -->
+  </main>
+</div>
+
+<!-- ── Styles locaux ── -->
+<style>
+  .stat-card-link { transition: box-shadow .15s, border-color .15s; cursor: pointer; }
+  .stat-card-link:hover { box-shadow: 0 2px 12px rgba(26,60,110,.12); border-color: var(--primary-border); }
+  .stat-card-active { border: 2px solid var(--primary) !important; background: var(--primary-bg); }
+  .stat-card-active .stat-val { color: var(--primary); }
+  .sidebar-user-dark .user-role { color: rgba(255,255,255,.45); }
+  .logout-white { color: rgba(255,255,255,.5); text-decoration:none; }
+  .logout-white:hover { color:#fff; }
+
+  /* Ligne en chargement AJAX */
+  tr.row-loading td { opacity: .5; pointer-events: none; }
+  tr.row-loading td:last-child::after {
+    content: '';
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(26,60,110,.2); border-top-color: var(--primary);
+    border-radius: 50%; animation: spin .7s linear infinite;
+    vertical-align: middle; margin-left: 8px;
+  }
+</style>
+
+<!-- ── Scripts AJAX ── -->
+{% block extra_scripts %}
+<script>
+'use strict';
+
+/* ── Recherche client-side ── */
+(function() {
+  const input = document.getElementById('search-huissier');
+  const tbody = document.getElementById('tbody-huissiers');
+  const noResult = document.getElementById('no-search-result');
+  if (!input || !tbody) return;
+
+  input.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    const rows = tbody.querySelectorAll('tr[data-search]');
+    let visible = 0;
+    rows.forEach(function(row) {
+      const match = !q || row.dataset.search.includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    if (noResult) noResult.style.display = visible === 0 ? 'block' : 'none';
+  });
+})();
+
+
+/* ── Changement de statut AJAX ── */
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-toggle-statut');
+  if (!btn) return;
+
+  const url = btn.dataset.url;
+  const uuid = btn.dataset.uuid;
+  const statut = btn.dataset.statut;
+  const nom = btn.dataset.nom;
+
+  const row = document.getElementById('row-' + uuid);
+  if (row) row.classList.add('row-loading');
+  btn.disabled = true;
+
+  fetchSecure(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'statut=' + encodeURIComponent(statut),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (row) row.classList.remove('row-loading');
+    if (!data.success) {
+      showToast('Erreur : ' + (data.error || 'Statut invalide.'), 'error');
+      btn.disabled = false;
+      return;
+    }
+
+    /* Mettre à jour le badge */
+    const badge = document.getElementById('badge-' + uuid);
+    if (badge) {
+      badge.className = 'badge badge-' + data.nouveau_statut;
+      badge.textContent = data.label;
+    }
+
+    /* Mettre à jour les boutons d'actions */
+    const actionsDiv = document.getElementById('actions-' + uuid);
+    if (actionsDiv) {
+      const actionUrl = url;
+      if (data.nouveau_statut === 'actif') {
+        actionsDiv.innerHTML = buildBtnStatut(actionUrl, uuid, 'inactif', nom, 'btn-red', 'Désactiver');
+      } else {
+        actionsDiv.innerHTML = buildBtnStatut(actionUrl, uuid, 'actif', nom, 'btn-green', 'Activer');
+      }
+    }
+
+    showToast(escapeHtml(nom) + ' — statut changé en ' + escapeHtml(data.label) + '.', 'success');
+  })
+  .catch(function() {
+    if (row) row.classList.remove('row-loading');
+    btn.disabled = false;
+    showToast('Erreur réseau. Veuillez réessayer.', 'error');
+  });
+});
+
+
+/* ── Renvoyer invitation AJAX ── */
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-renvoyer');
+  if (!btn) return;
+
+  const url = btn.dataset.url;
+  const uuid = btn.dataset.uuid;
+  const row = document.getElementById('row-' + uuid);
+
+  if (row) row.classList.add('row-loading');
+  btn.disabled = true;
+
+  fetchSecure(url, { method: 'POST' })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (row) row.classList.remove('row-loading');
+    btn.disabled = false;
+    if (data.success) {
+      showToast(data.message, 'success');
+    } else {
+      showToast('Erreur : ' + (data.error || 'Impossible de renvoyer.'), 'error');
+    }
+  })
+  .catch(function() {
+    if (row) row.classList.remove('row-loading');
+    btn.disabled = false;
+    showToast('Erreur réseau. Veuillez réessayer.', 'error');
+  });
+});
+
+
+/* ── Helpers ── */
+function buildBtnStatut(url, uuid, statut, nom, cls, label) {
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-xs ' + cls + ' btn-toggle-statut';
+  btn.dataset.url = url;
+  btn.dataset.uuid = uuid;
+  btn.dataset.statut = statut;
+  btn.dataset.nom = nom;
+  btn.textContent = label;
+  return btn.outerHTML;
+}
+
+function showToast(message, type) {
+  const container = document.getElementById('messages-container') || createToastContainer();
+  const div = document.createElement('div');
+  div.className = 'alert alert-' + (type === 'success' ? 'success' : 'error');
+  div.setAttribute('role', 'alert');
+  div.textContent = message;
+  const close = document.createElement('button');
+  close.className = 'alert-close';
+  close.textContent = '×';
+  close.setAttribute('aria-label', 'Fermer');
+  close.addEventListener('click', function() { div.remove(); });
+  div.appendChild(close);
+  container.appendChild(div);
+  setTimeout(function() {
+    div.style.transition = 'opacity .4s';
+    div.style.opacity = '0';
+    setTimeout(function() { div.remove(); }, 400);
+  }, 4000);
+}
+
+function createToastContainer() {
+  const c = document.createElement('div');
+  c.id = 'messages-container';
+  document.body.appendChild(c);
+  return c;
+}
+</script>
+{% endblock %}
+
+{% endblock %}

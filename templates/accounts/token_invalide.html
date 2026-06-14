@@ -1,1 +1,18 @@
-{% extends 'base/base.html' %}{% block body_class %}auth-page{% endblock %}{% block body %}<div class="auth-container"><div class="auth-card"><h2 class="auth-title">Lien invalide</h2><p class="auth-subtitle">{{ erreur }}</p><p><a href="/connexion/">Retour à la connexion</a></p></div></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Lien invalide{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-container">
+  <div class="auth-card" style="text-align:center;">
+    <div style="font-size:48px; margin-bottom:12px;">⚠</div>
+    <h1 class="auth-title" style="color:#991b1b; font-size:22px;">Lien invalide ou expiré</h1>
+    <p style="color:var(--text-secondary); font-size:14px; margin:12px 0 24px;">
+      {% if erreur %}{{ erreur }}{% else %}Ce lien n'est plus valide. Il a peut-être expiré ou déjà été utilisé.{% endif %}
+    </p>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <a href="{% url 'accounts:connexion' %}" class="btn btn-primary btn-full spinner-link">Retour à la connexion</a>
+      <a href="{% url 'accounts:recuperation_compte' %}" class="btn btn-ghost btn-full spinner-link">Récupérer mon compte</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

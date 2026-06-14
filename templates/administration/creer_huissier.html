@@ -4,13 +4,15 @@
 {% block body %}
 <div class="dashboard-layout">
   <aside class="sidebar sidebar-admin">
-    <div class="sidebar-logo"><div class="logo-box-sm"></div><div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div>
+    <div class="sidebar-logo">{% include 'base/_logo_sm.html' %}<div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div></div>
     <nav class="sidebar-nav">
       <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link">▦ Vue d'ensemble</a>
       <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white active">✎ Huissiers</a>
       <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a>
       <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
       <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
+      <div class="nav-section" style="margin-top:10px;">Communication</div>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">&#9993; Messagerie</a>#9993; Messagerie</a>
     </nav>
     <div class="sidebar-user sidebar-user-dark"><div class="user-avatar">A</div><div><div class="user-name" style="color:#fff;">Administrateur</div></div><a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a></div>
   </aside>

@@ -1,0 +1,205 @@
+{% extends 'base/base.html' %}
+{% block title %}Messagerie{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+  {% include 'messagerie/_sidebar.html' %}
+
+  <main class="dashboard-main" style="display:flex; flex-direction:column; height:100vh; overflow:hidden;">
+
+    <!-- Topbar -->
+    <header class="topbar" style="flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div>
+          <h1 class="topbar-title">
+            Messagerie
+            {% if total_non_lus %}
+            <span style="font-size:13px; font-weight:600; background:#c0392b; color:#fff; border-radius:999px; padding:1px 8px; margin-left:6px; vertical-align:middle;">{{ total_non_lus }}</span>
+            {% endif %}
+          </h1>
+          <p class="topbar-sub">&#128274; Tunnel chiffré AES-256</p>
+        </div>
+      </div>
+      <div>
+        <a href="{% url 'messagerie:nouvelle_conversation' %}" class="btn btn-primary spinner-link">
+          &#9998; Nouveau message
+        </a>
+      </div>
+    </header>
+
+    <!-- Barre d'outils style Gmail -->
+    <div class="gm-toolbar">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <input type="text" id="gm-search" class="gm-search-input" placeholder="&#9906; Rechercher dans les messages…" autocomplete="off">
+      </div>
+      <div style="font-size:12px; color:var(--text-secondary);">
+        {{ conversations|length }} conversation{% if conversations|length != 1 %}s{% endif %}
+      </div>
+    </div>
+
+    <!-- Liste conversations style Gmail -->
+    <div style="flex:1; overflow-y:auto; background:#fff;">
+
+      {% if conversations %}
+      <table class="gm-table" id="gm-table">
+        <tbody>
+        {% for item in conversations %}
+        <tr class="gm-row {% if item.non_lus %}gm-unread{% endif %}"
+            onclick="window.location='{% url 'messagerie:conversation' item.conv.uuid %}'"
+            data-search="{{ item.autre_nom|lower }} {{ item.conv.sujet|lower }} {{ item.snippet|lower }}">
+
+          <!-- Avatar -->
+          <td class="gm-td-avatar">
+            <div class="gm-avatar {% if item.non_lus %}gm-avatar-unread{% endif %}">
+              {{ item.autre_nom|first|upper }}
+            </div>
+          </td>
+
+          <!-- Expéditeur -->
+          <td class="gm-td-from">
+            <span class="gm-from {% if item.non_lus %}gm-bold{% endif %}">
+              {% if item.dernier_auteur_moi %}Moi{% else %}{{ item.autre_nom }}{% endif %}
+            </span>
+          </td>
+
+          <!-- Sujet + snippet -->
+          <td class="gm-td-body">
+            <span class="{% if item.non_lus %}gm-bold{% endif %}">{{ item.conv.sujet }}</span>
+            {% if item.snippet %}
+            <span class="gm-snippet"> — {{ item.snippet }}</span>
+            {% endif %}
+            {% if item.a_pj %}
+            <span class="gm-pj-icon" title="Pièce jointe">&#128206;</span>
+            {% endif %}
+          </td>
+
+          <!-- Badge non lus -->
+          <td class="gm-td-badge">
+            {% if item.non_lus %}
+            <span class="gm-badge-unread">{{ item.non_lus }}</span>
+            {% endif %}
+          </td>
+
+          <!-- Date -->
+          <td class="gm-td-date">
+            <span class="gm-date {% if item.non_lus %}gm-bold{% endif %}">
+              {{ item.conv.date_dernier_message|date:"d/m H:i" }}
+            </span>
+          </td>
+
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Aucun résultat recherche -->
+      <div id="gm-no-result" style="display:none; padding:40px; text-align:center; font-size:13px; color:var(--text-secondary);">
+        Aucune conversation ne correspond à cette recherche.
+      </div>
+
+      {% else %}
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:60%; gap:14px; color:var(--text-secondary);">
+        <div style="font-size:52px; opacity:.3;">&#128140;</div>
+        <div style="font-size:15px; font-weight:500; color:var(--text-primary);">Aucune conversation</div>
+        <div style="font-size:13px;">Démarrez une conversation sécurisée avec un correspondant.</div>
+        <a href="{% url 'messagerie:nouvelle_conversation' %}" class="btn btn-primary" style="margin-top:8px;">
+          &#9998; Nouveau message
+        </a>
+      </div>
+      {% endif %}
+
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+/* Recherche client-side */
+(function() {
+  var input = document.getElementById('gm-search');
+  if (!input) return;
+  input.addEventListener('input', function() {
+    var q = this.value.trim().toLowerCase();
+    var rows = document.querySelectorAll('#gm-table .gm-row');
+    var visible = 0;
+    rows.forEach(function(row) {
+      var match = !q || (row.dataset.search || '').includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    var noResult = document.getElementById('gm-no-result');
+    if (noResult) noResult.style.display = (visible === 0 && q) ? 'block' : 'none';
+  });
+})();
+</script>
+
+<style>
+/* ── Barre outils ── */
+.gm-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 20px; border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary); gap: 12px; flex-shrink: 0;
+}
+.gm-search-input {
+  border: 1px solid var(--border); border-radius: 22px;
+  padding: 6px 16px; font-size: 13px; background: #fff;
+  outline: none; width: 320px; transition: border-color .2s, box-shadow .2s;
+  font-family: inherit; color: var(--text-primary);
+}
+.gm-search-input:focus {
+  border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-bg, #e8f5ee);
+}
+
+/* ── Table Gmail ── */
+.gm-table {
+  width: 100%; border-collapse: collapse; table-layout: auto;
+}
+.gm-row {
+  cursor: pointer; transition: background .12s;
+  border-bottom: 1px solid #f0f0f0;
+}
+.gm-row:hover { background: #f5f6fa; }
+.gm-unread { background: #fff; }
+.gm-unread:hover { background: #eef2ff; }
+
+/* Colonnes */
+.gm-td-avatar { width: 52px;  padding: 10px 4px 10px 18px; vertical-align: middle; }
+.gm-td-from   { width: 220px; padding: 10px 14px; vertical-align: middle; white-space: nowrap; }
+.gm-td-body   { padding: 10px 8px; vertical-align: middle; max-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.gm-td-badge  { width: 36px;  padding: 10px 4px; vertical-align: middle; text-align: center; }
+.gm-td-date   { width: 90px;  padding: 10px 18px 10px 4px; vertical-align: middle; text-align: right; white-space: nowrap; }
+
+/* Avatar */
+.gm-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: var(--primary); flex-shrink: 0;
+}
+.gm-avatar-unread {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+
+/* Textes */
+.gm-from    { font-size: 13.5px; color: var(--text-primary); }
+.gm-bold    { font-weight: 700; color: var(--text-primary); }
+.gm-snippet { font-size: 13px; color: var(--text-secondary); font-weight: 400; }
+.gm-date    { font-size: 12px; color: var(--text-secondary); }
+.gm-pj-icon { margin-left: 6px; font-size: 12px; color: var(--text-secondary); }
+
+/* Badge non lus */
+.gm-badge-unread {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  background: var(--primary); color: #fff;
+  font-size: 10px; font-weight: 700; padding: 0 4px;
+}
+
+/* Ligne non lue : texte plus foncé */
+.gm-unread .gm-from,
+.gm-unread .gm-date { color: #111; }
+</style>
+{% endblock %}

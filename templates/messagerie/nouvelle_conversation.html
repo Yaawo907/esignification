@@ -1,0 +1,181 @@
+{% extends 'base/base.html' %}
+{% block title %}Nouveau message{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  {% include 'messagerie/_sidebar.html' %}
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Nouveau message</h1>
+        <p class="topbar-sub"><a href="{% url 'messagerie:liste_conversations' %}" style="color:var(--text-secondary);font-size:13px;text-decoration:none;">&#8592; Messagerie</a></p>
+      </div>
+    </header>
+    <div class="content-area">
+
+      {% if messages %}{% for m in messages %}<div class="alert-banner" style="margin-bottom:12px;">{{ m }}</div>{% endfor %}{% endif %}
+
+      <!-- ══ ÉTAPE 1 : Recherche destinataire — form GET SÉPARÉ ══ -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">1. Destinataire</span></div>
+        <div style="padding:16px 20px;">
+
+          <div id="dest-selectionne" style="display:none; margin-bottom:12px;">
+            <div style="background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-weight:600; font-size:14px;" id="dest-nom"></div>
+                <div class="td-sub" id="dest-email"></div>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="changerDest()">Changer</button>
+            </div>
+          </div>
+
+          <div id="zone-recherche-dest">
+            <form method="get" action="{% url 'messagerie:nouvelle_conversation' %}" style="display:flex; gap:8px; margin-bottom:14px;">
+              <input type="text" name="q" class="form-input"
+                     placeholder="Rechercher par email, nom, étude..."
+                     value="{{ q }}" style="flex:1;" autocomplete="off">
+              <button type="submit" class="btn btn-primary btn-sm">Rechercher</button>
+            </form>
+
+            {% if destinataires %}
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th></th></tr></thead>
+                <tbody>
+                {% for item in destinataires %}
+                <tr>
+                  <td><div class="td-name">{{ item.nom }}</div></td>
+                  <td><div class="td-sub">{{ item.user.email }}</div></td>
+                  <td><span class="badge badge-en_attente" style="font-size:10px;">{{ item.user.get_role_display }}</span></td>
+                  <td>
+                    <button type="button" class="btn btn-xs btn-primary"
+                      onclick="choisirDest('{{ item.user.uuid }}','{{ item.nom|escapejs }}','{{ item.user.email|escapejs }}')">
+                      Sélectionner
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% elif q %}
+            <div style="padding:14px; font-size:13px; color:var(--text-secondary);">Aucun résultat pour "{{ q }}".</div>
+            {% else %}
+            <div style="padding:14px; font-size:13px; color:var(--text-secondary);">Saisissez un email ou un nom pour rechercher un destinataire.</div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ══ ÉTAPE 2 : Rédaction — form POST SÉPARÉ ══ -->
+      <form method="post" enctype="multipart/form-data" novalidate id="form-nouvelle-conv">
+        {% csrf_token %}
+        <input type="hidden" name="destinataire_uuid" id="dest-uuid-input" value="">
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><span class="card-title">2. Message</span></div>
+          <div style="padding:16px 20px;">
+            <div class="form-group">
+              <label class="form-label">Sujet <span style="color:var(--red);">*</span></label>
+              <input type="text" name="sujet" id="sujet-input" class="form-input" maxlength="255"
+                     placeholder="Objet du message..." required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Message <span style="color:var(--red);">*</span></label>
+              <textarea name="contenu" class="form-input" rows="6" maxlength="5000"
+                placeholder="Rédigez votre message..." required id="contenu-input"></textarea>
+              <div class="td-sub" style="text-align:right; margin-top:4px;" id="char-count">0 / 5000</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><span class="card-title">3. Pièces jointes <span style="font-weight:400; color:var(--text-secondary);">(optionnel)</span></span></div>
+          <div style="padding:16px 20px;">
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
+              Formats acceptés : PDF, JPG, PNG, DOC, DOCX. Max 10 Mo par fichier. Les fichiers sont chiffrés avant stockage.
+            </p>
+            <label class="upload-zone-sm">
+              <input type="file" name="pieces_jointes" multiple id="pj-input"
+                     accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none;"
+                     onchange="previewPJ(this)">
+              &#128206; Cliquez pour joindre des fichiers
+            </label>
+            <div id="pj-liste" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+          </div>
+        </div>
+
+        <div style="text-align:right;">
+          <a href="{% url 'messagerie:liste_conversations' %}" class="btn btn-ghost" style="margin-right:8px;">Annuler</a>
+          <button type="submit" class="btn btn-primary" id="btn-envoyer" disabled>&#10148; Envoyer</button>
+        </div>
+      </form>
+
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+function choisirDest(uuid, nom, email) {
+  document.getElementById('dest-uuid-input').value = uuid;
+  document.getElementById('dest-nom').textContent = nom;
+  document.getElementById('dest-email').textContent = email;
+  document.getElementById('dest-selectionne').style.display = '';
+  document.getElementById('zone-recherche-dest').style.display = 'none';
+  verifier();
+}
+
+function changerDest() {
+  document.getElementById('dest-uuid-input').value = '';
+  document.getElementById('dest-selectionne').style.display = 'none';
+  document.getElementById('zone-recherche-dest').style.display = '';
+  verifier();
+}
+
+function previewPJ(input) {
+  var liste = document.getElementById('pj-liste');
+  liste.innerHTML = '';
+  Array.from(input.files).forEach(function(f) {
+    if (f.size > 10 * 1024 * 1024) {
+      alert(f.name + ' dépasse 10 Mo.');
+      input.value = '';
+      liste.innerHTML = '';
+      return;
+    }
+    var s = document.createElement('span');
+    s.className = 'msg-pj-item';
+    s.textContent = '\u{1F4C4} ' + f.name + ' (' + (f.size / 1024).toFixed(0) + ' Ko)';
+    liste.appendChild(s);
+  });
+}
+
+document.getElementById('contenu-input').addEventListener('input', function() {
+  document.getElementById('char-count').textContent = this.value.length + ' / 5000';
+  verifier();
+});
+document.getElementById('sujet-input').addEventListener('input', verifier);
+
+function verifier() {
+  var uuid    = document.getElementById('dest-uuid-input').value.trim();
+  var contenu = document.getElementById('contenu-input').value.trim();
+  var sujet   = document.getElementById('sujet-input').value.trim();
+  document.getElementById('btn-envoyer').disabled = !(uuid && contenu && sujet);
+}
+</script>
+<style>
+.upload-zone-sm {
+  display:flex; align-items:center; justify-content:center;
+  padding:20px 16px; width:100%;
+  border:2px dashed var(--border); border-radius:8px;
+  cursor:pointer; font-size:13px; color:var(--text-secondary);
+  transition:border-color .2s;
+}
+.upload-zone-sm:hover { border-color:var(--primary); color:var(--primary); }
+</style>
+{% endblock %}

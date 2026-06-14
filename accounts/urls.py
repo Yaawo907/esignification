@@ -12,4 +12,5 @@ urlpatterns = [
     path('modifier-mdp/', views.modifier_mot_de_passe, name='modifier_mdp'),
     path('recuperation/', views.recuperation_compte, name='recuperation_compte'),
     path('reinitialiser-mdp/', views.reinitialiser_mdp, name='reinitialiser_mdp'),
+    path('inscription/clerc/', views.inscription_clerc, name='inscription_clerc'),
 ]

@@ -1,0 +1,416 @@
+{% extends 'base/base.html' %}
+{% load static %}
+{% block title %}e-Signification Bénin — Notification électronique des actes judiciaires{% endblock %}
+{% block body_class %}landing-page{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Landing page styles ── */
+.landing-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
+  border-bottom: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px; height: 62px;
+}
+.landing-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.landing-logo .logo-box { width: 36px; height: 36px; background: #1a3c6e; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.landing-logo .logo-box svg { width: 20px; height: 20px; }
+.landing-logo .logo-text { font-size: 16px; font-weight: 700; color: #1a3c6e; }
+.landing-logo .logo-sub { font-size: 11px; color: #64748b; }
+.landing-nav-links { display: flex; align-items: center; gap: 10px; }
+
+.hero {
+  padding: 130px 40px 80px;
+  background: linear-gradient(160deg, #f0f4fb 0%, #e8f0f8 40%, #f8faff 100%);
+  text-align: center;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff; border: 1px solid #c5d3e8; border-radius: 999px;
+  padding: 4px 14px; font-size: 12px; color: #1a3c6e; font-weight: 600;
+  margin-bottom: 22px;
+}
+.hero h1 {
+  font-size: clamp(26px, 4vw, 46px); font-weight: 800; color: #0f172a;
+  line-height: 1.18; margin: 0 auto 16px; max-width: 720px;
+}
+.hero h1 span { color: #1a3c6e; }
+.hero-sub {
+  font-size: clamp(14px, 2vw, 18px); color: #475569;
+  max-width: 540px; margin: 0 auto 36px; line-height: 1.6;
+}
+.hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.hero-cta { padding: 13px 30px; border-radius: 8px; font-size: 15px; font-weight: 600; text-decoration: none; transition: transform .15s, box-shadow .15s; }
+.hero-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(26,60,110,.2); }
+.hero-cta-primary { background: #1a3c6e; color: #fff; }
+.hero-cta-secondary { background: #fff; color: #1a3c6e; border: 1.5px solid #c5d3e8; }
+.hero-cta-green { background: #134e3a; color: #fff; }
+.hero-cta-green:hover { box-shadow: 0 6px 20px rgba(19,78,58,.2); }
+
+.hero-mockup {
+  margin: 48px auto 0; max-width: 820px;
+  background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 16px; box-shadow: 0 20px 60px rgba(26,60,110,.12);
+  overflow: hidden;
+}
+.mockup-bar {
+  background: #f8faff; border-bottom: 1px solid #e2e8f0;
+  padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+}
+.mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+.mockup-inner { padding: 20px 24px; }
+
+/* Stats */
+.stats-band {
+  background: #1a3c6e; color: #fff;
+  padding: 36px 40px; display: flex; justify-content: center; flex-wrap: wrap; gap: 0;
+}
+.stat-item { text-align: center; padding: 12px 44px; border-right: 1px solid rgba(255,255,255,.15); }
+.stat-item:last-child { border-right: none; }
+.stat-num { font-size: 32px; font-weight: 800; }
+.stat-lbl { font-size: 12px; opacity: .75; margin-top: 4px; }
+
+/* Features */
+.section { padding: 72px 40px; max-width: 1100px; margin: 0 auto; }
+.section-title { font-size: clamp(20px,3vw,30px); font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+.section-sub { font-size: 15px; color: #64748b; margin-bottom: 44px; }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.feature-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 24px; transition: box-shadow .2s, border-color .2s;
+}
+.feature-card:hover { box-shadow: 0 8px 28px rgba(26,60,110,.1); border-color: #c5d3e8; }
+.feature-icon { font-size: 28px; margin-bottom: 12px; }
+.feature-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+.feature-desc { font-size: 13px; color: #64748b; line-height: 1.55; }
+
+/* How it works */
+.steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0; counter-reset: step; }
+.step { padding: 28px 24px; border-right: 1px solid #e2e8f0; counter-increment: step; position: relative; }
+.step:last-child { border-right: none; }
+.step::before {
+  content: counter(step); display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #1a3c6e; color: #fff; font-weight: 700; font-size: 15px;
+  margin-bottom: 14px;
+}
+.step-title { font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+.step-desc { font-size: 12px; color: #64748b; line-height: 1.5; }
+
+/* Security */
+.security-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.sec-item { display: flex; gap: 12px; align-items: flex-start; padding: 18px; background: #f8faff; border: 1px solid #e2e8f0; border-radius: 10px; }
+.sec-icon { font-size: 22px; flex-shrink: 0; }
+.sec-title { font-size: 13px; font-weight: 700; color: #1a3c6e; margin-bottom: 4px; }
+.sec-desc { font-size: 12px; color: #64748b; line-height: 1.45; }
+
+/* Justiciable CTA */
+.justiciable-band { background: #f0faf5; border-top: 1px solid #a7d7c0; border-bottom: 1px solid #a7d7c0; padding: 56px 40px; text-align: center; }
+.justiciable-band h2 { font-size: clamp(18px,3vw,26px); font-weight: 700; color: #0f172a; margin-bottom: 10px; }
+.justiciable-band p { font-size: 15px; color: #475569; margin-bottom: 28px; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+/* Footer */
+.landing-footer { background: #0f172a; color: #94a3b8; padding: 40px; text-align: center; font-size: 12px; }
+.landing-footer a { color: #94a3b8; text-decoration: none; }
+.landing-footer a:hover { color: #fff; }
+
+@media (max-width: 640px) {
+  .landing-nav { padding: 0 16px; }
+  .hero { padding: 100px 16px 56px; }
+  .stats-band { padding: 24px 16px; }
+  .stat-item { padding: 10px 20px; border-right: none; border-bottom: 1px solid rgba(255,255,255,.15); }
+  .stat-item:last-child { border-bottom: none; }
+  .section { padding: 48px 16px; }
+  .security-grid { grid-template-columns: 1fr; }
+  .justiciable-band { padding: 40px 16px; }
+  .landing-footer { padding: 24px 16px; }
+}
+</style>
+{% endblock %}
+
+{% block body %}
+
+<!-- ── Navigation ── -->
+<nav class="landing-nav">
+  <a href="/" class="landing-logo">
+    <div class="logo-box" style="background:transparent; padding:2px;">
+      {% if config.logo_chambre %}
+      <img src="{{ config.logo_chambre.url }}" alt="CNHJ" style="width:32px; height:32px; object-fit:contain;">
+      {% else %}
+      <img src="{% static 'img/logo_cnhj_32.png' %}" alt="CNHJ" style="width:32px; height:32px; object-fit:contain;">
+      {% endif %}
+    </div>
+    <div>
+      <div class="logo-text">{{ config.nom_plateforme|default:"e-Signification" }}</div>
+      <div class="logo-sub">Bénin</div>
+    </div>
+  </a>
+  <div class="landing-nav-links">
+    <a href="#fonctionnalites" class="btn btn-ghost" style="font-size:13px;" onclick="defiler(event,'fonctionnalites')">Fonctionnalités</a>
+    <a href="#securite" class="btn btn-ghost" style="font-size:13px;" onclick="defiler(event,'securite')">Sécurité</a>
+    <a href="{% url 'accounts:connexion' %}" class="btn btn-primary spinner-link" style="font-size:13px;">Se connecter</a>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="hero-badge">
+    <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+    Plateforme officielle — République du Bénin
+  </div>
+  <h1>La signification judiciaire<br><span>dématérialisée et sécurisée</span></h1>
+  <p class="hero-sub">
+    e-Signification Bénin permet aux huissiers de justice de notifier
+    électroniquement les actes judiciaires aux justiciables, avec valeur légale
+    et horodatage qualifié.
+  </p>
+  <div class="hero-actions">
+    <a href="{% url 'accounts:connexion' %}" class="hero-cta hero-cta-primary spinner-link">
+      Accès huissier →
+    </a>
+    <a href="#comment-ca-marche" class="hero-cta hero-cta-secondary" onclick="defiler(event,'comment-ca-marche')">
+      Comment ça marche
+    </a>
+  </div>
+
+  <!-- Mini-maquette -->
+  <div class="hero-mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot" style="background:#ef4444;"></div>
+      <div class="mockup-dot" style="background:#f59e0b;"></div>
+      <div class="mockup-dot" style="background:#22c55e;"></div>
+      <div style="flex:1; background:#e2e8f0; border-radius:4px; height:14px; margin-left:10px; max-width:300px;"></div>
+    </div>
+    <div class="mockup-inner">
+      <div style="display:grid; grid-template-columns:200px 1fr; gap:16px; min-height:160px;">
+        <!-- sidebar mini -->
+        <div style="background:#f8faff; border-radius:8px; padding:12px; border:1px solid #e2e8f0;">
+          <div style="font-size:10px; font-weight:700; color:#1a3c6e; margin-bottom:8px;">ESPACE HUISSIER</div>
+          <div style="font-size:11px; padding:5px 8px; border-radius:5px; background:#1a3c6e; color:#fff; margin-bottom:2px;">▦ Tableau de bord</div>
+          <div style="font-size:11px; padding:5px 8px; border-radius:5px; color:#475569; margin-bottom:2px;">✉ Significations</div>
+          <div style="font-size:11px; padding:5px 8px; border-radius:5px; color:#475569; margin-bottom:2px;">⌕ Rechercher</div>
+          <div style="font-size:11px; padding:5px 8px; border-radius:5px; color:#475569;">👥 Mes clercs</div>
+        </div>
+        <!-- content mini -->
+        <div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:12px;">
+            <div style="background:#f8faff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
+              <div style="font-size:18px; font-weight:700; color:#1a3c6e;">12</div>
+              <div style="font-size:10px; color:#94a3b8;">Envoyées</div>
+            </div>
+            <div style="background:#f8faff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
+              <div style="font-size:18px; font-weight:700; color:#d97706;">3</div>
+              <div style="font-size:10px; color:#94a3b8;">En attente</div>
+            </div>
+            <div style="background:#f8faff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
+              <div style="font-size:18px; font-weight:700; color:#134e3a;">9</div>
+              <div style="font-size:10px; color:#94a3b8;">Acceptées</div>
+            </div>
+          </div>
+          <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <div style="font-size:11px; font-weight:600; color:#0f172a;">Significations récentes</div>
+              <div style="font-size:10px; color:#1a3c6e;">Voir tout →</div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:5px 0; border-bottom:1px solid #f1f5f9; font-size:10px;">
+              <div style="font-family:monospace; color:#64748b;">SIGN-2026-0042</div>
+              <div style="color:#0f172a;">Marie KOFFI</div>
+              <div style="padding:2px 8px; border-radius:999px; font-size:9px; font-weight:600; background:#fffbea; color:#854f0b;">En attente</div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:5px 0; border-bottom:1px solid #f1f5f9; font-size:10px;">
+              <div style="font-family:monospace; color:#64748b;">SIGN-2026-0041</div>
+              <div style="color:#0f172a;">Jean AMOUSSOU</div>
+              <div style="padding:2px 8px; border-radius:999px; font-size:9px; font-weight:600; background:#f0fdf4; color:#134e3a;">Acceptée</div>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:5px 0; font-size:10px;">
+              <div style="font-family:monospace; color:#64748b;">SIGN-2026-0040</div>
+              <div style="color:#0f172a;">Société ABC</div>
+              <div style="padding:2px 8px; border-radius:999px; font-size:9px; font-weight:600; background:#eff6ff; color:#1a3c6e;">Répondue</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Stats ── -->
+<div class="stats-band">
+  <div class="stat-item"><div class="stat-num">100%</div><div class="stat-lbl">Valeur légale garantie</div></div>
+  <div class="stat-item"><div class="stat-num">AES-256</div><div class="stat-lbl">Chiffrement des actes</div></div>
+  <div class="stat-item"><div class="stat-num">TSA</div><div class="stat-lbl">Horodatage qualifié Certigna</div></div>
+  <div class="stat-item"><div class="stat-num">24/7</div><div class="stat-lbl">Accès à vos significations</div></div>
+</div>
+
+<!-- ── Fonctionnalités ── -->
+<div id="fonctionnalites" style="background:#fff;">
+  <div class="section">
+    <div class="section-title">Fonctionnalités</div>
+    <div class="section-sub">Tout ce dont un huissier de justice a besoin pour dématérialiser ses significations.</div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">✉</div>
+        <div class="feature-title">Notification électronique</div>
+        <div class="feature-desc">Envoyez vos actes judiciaires par email sécurisé. Le justiciable accepte ou refuse via un lien authentifié.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🏅</div>
+        <div class="feature-title">Certificat de réception</div>
+        <div class="feature-desc">Chaque signification acceptée génère un certificat horodaté avec preuve cryptographique de la notification.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔁</div>
+        <div class="feature-title">Relances automatiques</div>
+        <div class="feature-desc">Deux relances programmées en cas de non-réponse, avec bascule automatique vers la signification traditionnelle.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📄</div>
+        <div class="feature-title">Réponse du justiciable</div>
+        <div class="feature-desc">Le justiciable peut joindre un document de réponse directement sur la plateforme, reçu instantanément par l'huissier.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">👥</div>
+        <div class="feature-title">Gestion des clercs</div>
+        <div class="feature-desc">L'huissier peut inviter ses clercs assermentés pour leur donner accès à la plateforme de l'étude.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <div class="feature-title">Piste d'audit immuable</div>
+        <div class="feature-desc">Chaque action est enregistrée dans un journal d'audit en écriture seule, avec adresse IP et horodatage.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Comment ça marche ── -->
+<div id="comment-ca-marche" style="background:#f8faff; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0;">
+  <div class="section">
+    <div class="section-title">Comment ça marche</div>
+    <div class="section-sub">Un processus simple et sécurisé en 5 étapes.</div>
+    <div class="steps-grid" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+      <div class="step">
+        <div class="step-title">Enregistrement du justiciable</div>
+        <div class="step-desc">L'huissier invite le justiciable qui crée son domicile électronique vérifié.</div>
+      </div>
+      <div class="step">
+        <div class="step-title">Envoi de la signification</div>
+        <div class="step-desc">L'huissier joint l'acte (chiffré AES-256) et l'envoie via la plateforme.</div>
+      </div>
+      <div class="step">
+        <div class="step-title">Notification par email</div>
+        <div class="step-desc">Le justiciable reçoit un email sécurisé avec un lien unique pour consulter l'acte.</div>
+      </div>
+      <div class="step">
+        <div class="step-title">Acceptation ou refus</div>
+        <div class="step-desc">Le justiciable accepte ou refuse. Une réponse peut être jointe si requise.</div>
+      </div>
+      <div class="step">
+        <div class="step-title">Certificat &amp; archivage</div>
+        <div class="step-desc">Un certificat horodaté (Certigna TSA) est généré et conservé dans le dossier.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Sécurité ── -->
+<div id="securite" style="background:#fff;">
+  <div class="section">
+    <div class="section-title">Sécurité de niveau professionnel</div>
+    <div class="section-sub">Conçu pour respecter les exigences de la profession d'huissier de justice.</div>
+    <div class="security-grid">
+      <div class="sec-item">
+        <div class="sec-icon">🔐</div>
+        <div>
+          <div class="sec-title">Chiffrement AES-256</div>
+          <div class="sec-desc">Tous les actes judiciaires sont chiffrés au repos et en transit. Seul le destinataire peut les déchiffrer.</div>
+        </div>
+      </div>
+      <div class="sec-item">
+        <div class="sec-icon">⏱</div>
+        <div>
+          <div class="sec-title">Horodatage qualifié (TSA)</div>
+          <div class="sec-desc">Chaque signification est horodatée via Certigna, autorité de certification agréée.</div>
+        </div>
+      </div>
+      <div class="sec-item">
+        <div class="sec-icon">🌳</div>
+        <div>
+          <div class="sec-title">Arbre de Merkle</div>
+          <div class="sec-desc">L'intégrité de l'ensemble des significations est vérifiable par arbre de Merkle, assurant l'inaltérabilité.</div>
+        </div>
+      </div>
+      <div class="sec-item">
+        <div class="sec-icon">🛡</div>
+        <div>
+          <div class="sec-title">Double authentification</div>
+          <div class="sec-desc">Connexion sécurisée avec code OTP par email, SMS ou application TOTP (Google Authenticator).</div>
+        </div>
+      </div>
+      <div class="sec-item">
+        <div class="sec-icon">🔑</div>
+        <div>
+          <div class="sec-title">URLs pseudonymisées</div>
+          <div class="sec-desc">Aucune clé primaire numérique exposée dans les URLs. Seuls des UUID sont utilisés.</div>
+        </div>
+      </div>
+      <div class="sec-item">
+        <div class="sec-icon">📋</div>
+        <div>
+          <div class="sec-title">Journal d'audit immuable</div>
+          <div class="sec-desc">Chaque action est tracée en écriture seule. La piste d'audit ne peut pas être modifiée ou supprimée.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CTA justiciable ── -->
+<div class="justiciable-band">
+  <h2>Vous êtes justiciable ?</h2>
+  <p>
+    Si vous avez reçu un email de notification d'un huissier de justice,
+    vous pouvez consulter votre acte directement depuis le lien reçu.
+    Pour accéder à votre espace personnel, utilisez le bouton ci-dessous.
+  </p>
+  <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+    <a href="{% url 'accounts:connexion' %}" class="hero-cta hero-cta-green spinner-link">
+      Accès justiciable →
+    </a>
+    <a href="#comment-ca-marche" class="hero-cta hero-cta-secondary" onclick="defiler(event,'comment-ca-marche')">
+      En savoir plus
+    </a>
+  </div>
+</div>
+
+<!-- ── Footer ── -->
+<footer class="landing-footer">
+  <div style="margin-bottom:12px;">
+    <strong style="color:#e2e8f0; font-size:14px;">e-Signification Bénin</strong>
+  </div>
+  <div style="margin-bottom:16px;">
+    Plateforme officielle de notification électronique des actes judiciaires — République du Bénin
+  </div>
+  <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap; margin-bottom:16px;">
+    <a href="{% url 'accounts:connexion' %}">Connexion huissier</a>
+    <span>·</span>
+    <a href="{% url 'accounts:connexion' %}">Accès justiciable</a>
+    {% if config.email_contact %}<span>·</span><a href="mailto:{{ config.email_contact }}">Contact</a>{% endif %}
+  </div>
+  <div style="font-size:11px; color:#475569;">
+    © {% now "Y" %} e-Signification Bénin — Tous droits réservés
+  </div>
+</footer>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+function defiler(e, id) {
+  e.preventDefault();
+  var el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+{% endblock %}
+
+{% endblock %}

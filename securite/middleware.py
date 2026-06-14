@@ -36,9 +36,11 @@ class SecuriteHeadersMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        from django.http import HttpResponseBase
         response = self.get_response(request)
-        response['X-Content-Type-Options'] = 'nosniff'
-        response['X-Frame-Options'] = 'DENY'
-        response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        if isinstance(response, HttpResponseBase):
+            response['X-Content-Type-Options'] = 'nosniff'
+            response['X-Frame-Options'] = 'DENY'
+            response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+            response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
         return response

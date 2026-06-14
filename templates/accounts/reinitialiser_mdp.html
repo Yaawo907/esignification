@@ -1,1 +1,40 @@
-{% extends 'base/base.html' %}{% block body_class %}auth-page{% endblock %}{% block body %}<div class="auth-container"><div class="auth-card"><h2 class="auth-title">Nouveau mot de passe</h2><form method="post" novalidate>{% csrf_token %}{% if form.non_field_errors %}<div class="form-error">{% verbatim %}{ form.non_field_errors }{% endverbatim %}</div>{% endif %}{% for field in form %}<div class="form-group"><label class="form-label">{% verbatim %}{ field.label }{% endverbatim %}</label>{% verbatim %}{ field }{% endverbatim %}</div>{% endfor %}<button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="..."><span class="btn-text">Valider</span><span class="btn-loader" style="display:none;"></span></button></form></div></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Nouveau mot de passe{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-logo">
+      {% include 'base/_logo_lg.html' %}
+      <h1 class="auth-title">Nouveau mot de passe</h1>
+      <p class="auth-subtitle">Choisissez un mot de passe solide d'au moins 10 caractères.</p>
+    </div>
+    {% if form.non_field_errors %}
+    <div class="form-error" role="alert">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+    {% endif %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_nouveau_mdp" class="form-label">Nouveau mot de passe *</label>
+        <div style="position:relative;">
+          <input type="password" name="nouveau_mdp" id="id_nouveau_mdp" class="form-input{% if form.nouveau_mdp.errors %} input-error{% endif %}"
+            placeholder="10 caractères minimum" autocomplete="new-password" style="padding-right:40px;">
+          <button type="button" onclick="var i=document.getElementById('id_nouveau_mdp');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈';"
+            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;">👁</button>
+        </div>
+        {% if form.nouveau_mdp.errors %}<p class="field-error">{{ form.nouveau_mdp.errors.0 }}</p>{% endif %}
+      </div>
+      <div class="form-group">
+        <label for="id_confirmer_mdp" class="form-label">Confirmer le mot de passe *</label>
+        <input type="password" name="confirmer_mdp" id="id_confirmer_mdp"
+          class="form-input{% if form.confirmer_mdp.errors %} input-error{% endif %}"
+          placeholder="Répétez le mot de passe" autocomplete="new-password">
+        {% if form.confirmer_mdp.errors %}<p class="field-error">{{ form.confirmer_mdp.errors.0 }}</p>{% endif %}
+      </div>
+      <button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="Enregistrement…">
+        Enregistrer le mot de passe
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,1 +1,315 @@
-{% extends 'base/base.html' %}{% block body_class %}dashboard-page{% endblock %}{% block body %}<div class="auth-container" style="max-width:700px;"><div class="auth-card"><h2>Rechercher Justiciable</h2><a href="{% url 'huissiers:tableau_de_bord' %}" class="btn btn-ghost">Retour</a></div></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Rechercher un justiciable{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div>
+        <div class="logo-name">e-Signification</div>
+        <div class="logo-sub">Espace huissier</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link">▦ Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link">✉ Significations</a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item active">⌕ Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link">+ Inviter</a>
+      <div class="nav-section" style="margin-top:10px;">Étude</div>
+      <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item spinner-link"><span class="nav-icon">👥</span> Mes clercs</a>
+      <a href="{% url 'huissiers:liste_demandes_modification' %}" class="nav-item spinner-link"><span class="nav-icon">✏</span> Demandes modif.</a>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link"><span class="nav-icon">&#9993;</span> Messagerie</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ request.user.email }}</div>
+        <div class="user-role">Huissier</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <!-- ── Contenu principal ── -->
+  <main class="dashboard-main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Rechercher un justiciable</h1>
+        <div class="topbar-sub">Recherchez par nom, NPI, IFU ou email de domicile électronique</div>
+      </div>
+      <div class="topbar-actions">
+        <a href="{% url 'huissiers:inviter' %}" class="btn btn-ghost spinner-link">+ Inviter un nouveau</a>
+      </div>
+    </header>
+
+    <div class="content-area">
+
+      <!-- ── Formulaire de recherche ── -->
+      <div class="card" style="margin-bottom:20px;">
+        <div style="padding:20px 24px;">
+          <form method="get" id="form-recherche" autocomplete="off">
+
+            <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+              <div style="flex:1; min-width:200px;">
+                <label class="form-label" for="q">Terme de recherche</label>
+                <div style="position:relative;">
+                  <input type="text" name="q" id="q" class="form-input"
+                    placeholder="Nom, prénom, NPI, IFU, email…"
+                    value="{{ q }}"
+                    minlength="2"
+                    style="padding-left:36px;"
+                    autofocus>
+                  <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:15px; pointer-events:none;">⌕</span>
+                </div>
+                <div id="msg-trop-court" style="display:none; font-size:11px; color:var(--red); margin-top:4px;">
+                  Saisissez au moins 2 caractères.
+                </div>
+              </div>
+
+              <div style="min-width:160px;">
+                <label class="form-label" for="filtre">Rechercher dans</label>
+                <select name="filtre" id="filtre" class="form-input">
+                  <option value="tous"  {% if filtre == 'tous' or not filtre %}selected{% endif %}>Tous les champs</option>
+                  <option value="npi"   {% if filtre == 'npi'  %}selected{% endif %}>NPI uniquement</option>
+                  <option value="ifu"   {% if filtre == 'ifu'  %}selected{% endif %}>IFU uniquement</option>
+                  <option value="email" {% if filtre == 'email' %}selected{% endif %}>Email de domicile</option>
+                </select>
+              </div>
+
+              <div>
+                <button type="submit" class="btn btn-primary btn-spinner"
+                  data-loading="Recherche en cours…"
+                  style="height:42px; padding:0 24px;">
+                  Rechercher
+                </button>
+              </div>
+
+              {% if q %}
+              <div>
+                <a href="?" class="btn btn-ghost" style="height:42px; padding:0 14px; line-height:42px;">
+                  ✕ Effacer
+                </a>
+              </div>
+              {% endif %}
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+      <!-- ── Résultats ── -->
+      {% if q %}
+
+        {% if resultats %}
+
+        <div style="margin-bottom:12px; font-size:13px; color:var(--text-secondary);">
+          <strong style="color:var(--text-primary);">{{ resultats|length }}</strong>
+          justiciable{% if resultats|length != 1 %}s{% endif %} trouvé{% if resultats|length != 1 %}s{% endif %}
+          pour <em>« {{ q }} »</em>
+          {% if filtre and filtre != 'tous' %} — filtre&nbsp;: <em>{{ filtre|upper }}</em>{% endif %}
+          {% if resultats|length == 20 %}
+            &nbsp;<span style="color:var(--orange);">· Affiché limité à 20, précisez la recherche.</span>
+          {% endif %}
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Justiciable</th>
+                  <th>Type</th>
+                  <th>NPI / IFU</th>
+                  <th>Téléphone</th>
+                  <th>Email de domicile</th>
+                  <th style="text-align:right;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for j in resultats %}
+                <tr>
+                  <!-- Identité -->
+                  <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div style="
+                        width:36px; height:36px; border-radius:50%;
+                        background:var(--primary); color:#fff;
+                        display:flex; align-items:center; justify-content:center;
+                        font-size:13px; font-weight:600; flex-shrink:0; text-transform:uppercase;">
+                        {{ j.nom|first }}{% if j.prenom %}{{ j.prenom|first }}{% endif %}
+                      </div>
+                      <div>
+                        <div class="td-name">
+                          {% if j.prenom %}{{ j.prenom }} {% endif %}{{ j.nom }}
+                        </div>
+                        <div class="td-sub">Compte vérifié</div>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- Type -->
+                  <td>
+                    {% if j.type_compte == 'entreprise' %}
+                      <span class="badge" style="background:#e8f4f8; color:#1a6e6e; border:1px solid #a8d5d5;">🏢 Entreprise</span>
+                    {% else %}
+                      <span class="badge" style="background:#e8f0f8; color:#1a3c6e; border:1px solid #a8c0d5;">👤 Particulier</span>
+                    {% endif %}
+                  </td>
+
+                  <!-- NPI / IFU -->
+                  <td>
+                    {% if j.npi %}
+                    <div style="font-size:12px; font-family:monospace;">
+                      <span style="font-size:10px; color:var(--text-light);">NPI</span>&nbsp;{{ j.npi }}
+                    </div>
+                    {% endif %}
+                    {% if j.ifu %}
+                    <div style="font-size:12px; font-family:monospace; margin-top:2px;">
+                      <span style="font-size:10px; color:var(--text-light);">IFU</span>&nbsp;{{ j.ifu }}
+                    </div>
+                    {% endif %}
+                    {% if not j.npi and not j.ifu %}
+                      <span style="font-size:11px; color:var(--text-light);">—</span>
+                    {% endif %}
+                  </td>
+
+                  <!-- Téléphone -->
+                  <td>
+                    <div style="font-size:13px;">{{ j.telephone|default:"—" }}</div>
+                  </td>
+
+                  <!-- Email domicile -->
+                  <td>
+                    <div style="font-size:12px; color:var(--text-secondary);">{{ j.email_domicile }}</div>
+                    <div class="td-sub" style="color:#134e3a;">✓ Domicile vérifié</div>
+                  </td>
+
+                  <!-- Action -->
+                  <td style="text-align:right;">
+                    <a href="{% url 'significations:envoyer' %}?justiciable={{ j.uuid }}"
+                      class="btn btn-sm btn-primary spinner-link"
+                      title="Envoyer une signification à ce justiciable">
+                      ✉ Signifier
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {% else %}
+
+        <!-- Aucun résultat -->
+        <div class="card" style="text-align:center; padding:52px 24px;">
+          <div style="font-size:44px; margin-bottom:12px; opacity:.5;">⌕</div>
+          <div style="font-size:16px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">
+            Aucun justiciable trouvé
+          </div>
+          <div style="font-size:13px; color:var(--text-secondary); margin-bottom:24px; max-width:400px; margin-inline:auto;">
+            Aucun résultat pour <strong>« {{ q }} »</strong>
+            {% if filtre and filtre != 'tous' %} dans le champ <em>{{ filtre|upper }}</em>{% endif %}.
+            Vérifiez l'orthographe ou essayez un autre filtre.
+          </div>
+          <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <a href="?" class="btn btn-ghost">Nouvelle recherche</a>
+            <a href="{% url 'huissiers:inviter' %}" class="btn btn-primary spinner-link">
+              + Inviter ce justiciable
+            </a>
+          </div>
+        </div>
+
+        {% endif %}
+
+      {% else %}
+
+      <!-- État initial : pas encore de recherche -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px; margin-bottom:20px;">
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-icon" style="background:#e8f0f8; color:#1a3c6e; font-size:18px;">⌕</div>
+          <div class="stat-label">Par nom ou prénom</div>
+          <div class="stat-value" style="font-size:12px; color:var(--text-secondary);">Recherche globale</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-icon" style="background:#f0f8e8; color:#134e3a; font-size:13px; font-weight:700;">NPI</div>
+          <div class="stat-label">Par NPI</div>
+          <div class="stat-value" style="font-size:12px; color:var(--text-secondary);">Numéro personnel</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-icon" style="background:#f8f0e8; color:#8b4513; font-size:13px; font-weight:700;">IFU</div>
+          <div class="stat-label">Par IFU</div>
+          <div class="stat-value" style="font-size:12px; color:var(--text-secondary);">Identifiant fiscal</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+          <div class="stat-icon" style="background:#f8e8f0; color:#6e1a4e; font-size:16px;">@</div>
+          <div class="stat-label">Par email</div>
+          <div class="stat-value" style="font-size:12px; color:var(--text-secondary);">Domicile électronique</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:18px 24px; display:flex; gap:14px; align-items:flex-start;">
+        <div style="font-size:20px; flex-shrink:0; margin-top:1px; color:var(--primary);">ℹ</div>
+        <div>
+          <div style="font-weight:600; color:var(--text-primary); margin-bottom:4px;">
+            Seuls les justiciables avec un domicile électronique vérifié apparaissent.
+          </div>
+          <div style="font-size:13px; color:var(--text-secondary);">
+            Si le justiciable n'est pas encore inscrit, envoyez-lui une invitation depuis
+            <a href="{% url 'huissiers:inviter' %}" class="link spinner-link">Inviter un justiciable</a>.
+            Il recevra un lien par email pour créer son compte et activer son domicile électronique.
+          </div>
+        </div>
+      </div>
+
+      {% endif %}
+
+    </div><!-- /content-area -->
+  </main>
+</div>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+(function() {
+  var filtre = document.getElementById('filtre');
+  var q = document.getElementById('q');
+  var form = document.getElementById('form-recherche');
+  var msg = document.getElementById('msg-trop-court');
+  if (!filtre || !q || !form) return;
+
+  /* Resoumettre si le filtre change pendant une recherche active */
+  filtre.addEventListener('change', function() {
+    if (q.value.trim().length >= 2) {
+      form.submit();
+    }
+  });
+
+  /* Valider longueur minimale à la soumission */
+  form.addEventListener('submit', function(e) {
+    var val = q.value.trim();
+    if (val.length > 0 && val.length < 2) {
+      e.preventDefault();
+      q.style.borderColor = 'var(--red, #e53e3e)';
+      q.focus();
+      if (msg) msg.style.display = 'block';
+    }
+  });
+
+  /* Effacer le message d'erreur à la saisie */
+  q.addEventListener('input', function() {
+    q.style.borderColor = '';
+    if (msg) msg.style.display = 'none';
+  });
+})();
+</script>
+{% endblock %}
+
+{% endblock %}

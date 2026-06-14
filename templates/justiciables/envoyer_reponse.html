@@ -1,25 +1,181 @@
 {% extends 'base/base.html' %}
-{% block title %}Envoyer une réponse{% endblock %}
+{% block title %}Répondre à la signification {{ sig.reference }}{% endblock %}
 {% block body_class %}dashboard-page{% endblock %}
+
 {% block body %}
-<div class="auth-container" style="max-width:560px;">
-  <div class="auth-card">
-    <h2 class="auth-title">Envoyer votre réponse</h2>
-    <p class="auth-subtitle">Signification : <strong>{{ sig.reference }}</strong></p>
-    <form method="post" enctype="multipart/form-data" novalidate>
-      {% csrf_token %}
-      <div class="form-group">
-        <label class="form-label">Fichier de réponse (PDF ou document scanné) *</label>
-        <input type="file" name="fichier_reponse" class="form-input" required>
+<div class="dashboard-layout">
+
+  <aside class="sidebar sidebar-justiciable">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Espace justiciable</div></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Mon espace</div>
+      <a href="{% url 'justiciables:tableau_de_bord' %}" class="nav-item spinner-link nav-green">▦ Tableau de bord</a>
+      <a href="{% url 'justiciables:significations' %}" class="nav-item active nav-green">✉ Significations reçues</a>
+      <a href="{% url 'justiciables:profil' %}" class="nav-item spinner-link nav-green">⚙ Mon profil</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar user-avatar-green">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ sig.justiciable.nom_complet }}</div>
+        <div class="user-role">Justiciable</div>
       </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <a href="{% url 'justiciables:tableau_de_bord' %}" class="btn btn-ghost">Annuler</a>
-        <button type="submit" class="btn btn-primary btn-spinner" data-loading="Envoi…">
-          <span class="btn-text">Informer l'huissier</span>
-          <span class="btn-loader" style="display:none;"></span>
-        </button>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn">⏻</a>
+    </div>
+  </aside>
+
+  <main class="dashboard-main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Répondre à la signification</h1>
+        <div class="topbar-sub">Réf. {{ sig.reference }}</div>
       </div>
-    </form>
-  </div>
+      <div class="topbar-actions">
+        <a href="{% url 'justiciables:significations' %}" class="btn btn-ghost spinner-link">← Retour</a>
+      </div>
+    </header>
+
+    <div class="content-area" style="max-width:640px;">
+
+      <!-- Récapitulatif de la signification -->
+      <div class="card" style="margin-bottom:16px; padding:18px 22px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px;">
+          Signification concernée
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 24px;">
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Référence</div>
+            <div style="font-family:monospace; font-size:13px; font-weight:600;">{{ sig.reference }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Huissier</div>
+            <div style="font-size:13px;">Me {{ sig.huissier.prenom }} {{ sig.huissier.nom }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Étude</div>
+            <div style="font-size:13px; color:var(--text-secondary);">{{ sig.huissier.nom_etude }}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; color:var(--text-light);">Date d'envoi</div>
+            <div style="font-size:13px;">{{ sig.date_envoi|date:"d/m/Y" }}</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <a href="{% url 'significations:telecharger_acte' sig.uuid %}"
+            class="btn btn-sm btn-ghost spinner-link" data-loading="Chargement…" target="_blank">
+            📄 Consulter l'acte
+          </a>
+        </div>
+      </div>
+
+      <!-- Formulaire de réponse -->
+      <div class="card" style="padding:20px 24px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px;">
+          Votre réponse
+        </div>
+
+        <div style="background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:12px 16px; font-size:13px; color:#134e3a; margin-bottom:18px;">
+          <strong>ℹ Important :</strong> La date et l'heure d'envoi de votre réponse seront horodatées et transmises à l'huissier. Joignez le document demandé en format PDF.
+        </div>
+
+        <form method="post" enctype="multipart/form-data" novalidate id="form-reponse">
+          {% csrf_token %}
+
+          <div class="form-group">
+            <label class="form-label" for="fichier_reponse">Document de réponse (PDF) *</label>
+
+            <!-- Zone de drop stylisée -->
+            <div id="drop-zone" style="
+              border:2px dashed #a7d7c0; border-radius:10px; padding:28px 20px;
+              text-align:center; cursor:pointer; transition:border-color .2s, background .2s;
+              background:#fafffe;"
+              onclick="document.getElementById('fichier_reponse').click()"
+              ondragover="event.preventDefault(); this.style.background='#f0fdf4';"
+              ondragleave="this.style.background='#fafffe';"
+              ondrop="handleDrop(event)">
+              <div style="font-size:28px; margin-bottom:8px;">📄</div>
+              <div style="font-size:14px; font-weight:600; color:#134e3a;">Cliquez ou glissez votre fichier ici</div>
+              <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">PDF uniquement — max 20 Mo</div>
+              <input type="file" name="fichier_reponse" id="fichier_reponse"
+                accept=".pdf" style="display:none;" required
+                onchange="previewFichier(this)">
+            </div>
+
+            <!-- Aperçu du fichier sélectionné -->
+            <div id="fichier-preview" style="display:none; margin-top:10px; background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:12px 16px; display:none; align-items:center; gap:10px;">
+              <div style="font-size:24px; flex-shrink:0;">📄</div>
+              <div style="flex:1; min-width:0;">
+                <div id="fichier-nom" style="font-weight:600; font-size:13px; color:#134e3a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+                <div id="fichier-taille" style="font-size:11px; color:var(--text-secondary); margin-top:2px;"></div>
+              </div>
+              <button type="button" onclick="retirerFichier()" style="background:none; border:none; cursor:pointer; color:var(--text-light); font-size:16px;" title="Retirer">✕</button>
+            </div>
+          </div>
+
+          <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
+            <a href="{% url 'justiciables:significations' %}" class="btn btn-ghost">Annuler</a>
+            <button type="submit" id="btn-envoyer" class="btn btn-primary btn-spinner" data-loading="Envoi en cours…" disabled style="opacity:.5; cursor:not-allowed;">
+              ↩ Informer l'huissier
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </main>
 </div>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+function previewFichier(input) {
+  var preview = document.getElementById('fichier-preview');
+  var nomEl = document.getElementById('fichier-nom');
+  var tailleEl = document.getElementById('fichier-taille');
+  var btn = document.getElementById('btn-envoyer');
+  var dropZone = document.getElementById('drop-zone');
+
+  if (input.files && input.files[0]) {
+    var f = input.files[0];
+    if (nomEl) nomEl.textContent = f.name;
+    if (tailleEl) tailleEl.textContent = (f.size / 1024 / 1024).toFixed(2) + ' Mo';
+    if (preview) { preview.style.display = 'flex'; }
+    if (dropZone) { dropZone.style.display = 'none'; }
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+  }
+}
+
+function retirerFichier() {
+  var input = document.getElementById('fichier_reponse');
+  var preview = document.getElementById('fichier-preview');
+  var dropZone = document.getElementById('drop-zone');
+  var btn = document.getElementById('btn-envoyer');
+  if (input) input.value = '';
+  if (preview) preview.style.display = 'none';
+  if (dropZone) dropZone.style.display = 'block';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.5'; btn.style.cursor = 'not-allowed'; }
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  var dropZone = document.getElementById('drop-zone');
+  if (dropZone) dropZone.style.background = '#fafffe';
+  var files = event.dataTransfer.files;
+  if (files && files[0]) {
+    var input = document.getElementById('fichier_reponse');
+    if (input) {
+      /* Créer un DataTransfer pour affecter les fichiers à l'input */
+      var dt = new DataTransfer();
+      dt.items.add(files[0]);
+      input.files = dt.files;
+      previewFichier(input);
+    }
+  }
+}
+</script>
+{% endblock %}
+
 {% endblock %}

@@ -1,1 +1,31 @@
-{% extends 'base/base.html' %}{% block body_class %}auth-page{% endblock %}{% block body %}<div class="auth-container"><div class="auth-card"><h2 class="auth-title">Récupération de compte</h2><form method="post" novalidate>{% csrf_token %}{% if form.non_field_errors %}<div class="form-error">{% verbatim %}{ form.non_field_errors }{% endverbatim %}</div>{% endif %}{% for field in form %}<div class="form-group"><label class="form-label">{% verbatim %}{ field.label }{% endverbatim %}</label>{% verbatim %}{ field }{% endverbatim %}</div>{% endfor %}<button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="..."><span class="btn-text">Valider</span><span class="btn-loader" style="display:none;"></span></button></form></div></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Récupération de compte{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block body %}
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-logo">
+      {% include 'base/_logo_lg.html' %}
+      <h1 class="auth-title">Mot de passe oublié ?</h1>
+      <p class="auth-subtitle">Saisissez votre email pour recevoir un lien de réinitialisation.</p>
+    </div>
+    {% if form.non_field_errors %}
+    <div class="form-error" role="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_email" class="form-label">Adresse email de votre compte</label>
+        <input type="email" name="email" id="id_email" class="form-input" placeholder="votre@email.bj" autocomplete="email" autofocus>
+        {% if form.email.errors %}<p class="field-error">{{ form.email.errors.0 }}</p>{% endif %}
+      </div>
+      <button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="Envoi en cours…">
+        Recevoir le lien
+      </button>
+    </form>
+    <div class="auth-links">
+      <a href="{% url 'accounts:connexion' %}">← Retour à la connexion</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

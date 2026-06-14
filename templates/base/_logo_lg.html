@@ -1,0 +1,7 @@
+{% load static %}
+{% if config.logo_chambre %}
+<img src="{{ config.logo_chambre.url }}" alt="CNHJ"
+     style="width:80px; height:80px; object-fit:contain; display:block; margin:0 auto 14px; flex-shrink:0;">
+{% else %}
+<div style="width:80px; height:80px; background:var(--primary); border-radius:14px; margin:0 auto 14px; flex-shrink:0;"></div>
+{% endif %}

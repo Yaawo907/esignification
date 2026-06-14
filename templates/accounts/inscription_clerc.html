@@ -1,0 +1,140 @@
+{% extends 'base/base.html' %}
+{% block title %}Activation de votre compte clerc{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block body %}
+<div class="auth-container">
+  <div class="auth-card" style="max-width:460px; width:100%;">
+
+    <!-- Logo -->
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="display:inline-flex; align-items:center; gap:10px;">
+        {% include 'base/_logo_sm.html' %}
+        <div>
+          <div class="logo-name" style="font-size:18px;">e-Signification</div>
+          <div class="logo-sub">Bénin</div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="auth-title">Activation de votre compte clerc</h2>
+    <p class="auth-subtitle">
+      Bienvenue {% if prenom %}{{ prenom }} {% endif %}{% if nom %}{{ nom }}{% endif %} !<br>
+      Choisissez un mot de passe pour accéder à la plateforme.
+    </p>
+
+    <!-- Info compte -->
+    <div style="background:#f0f4fb; border:1px solid #c5d3e8; border-radius:8px; padding:12px 16px; margin-bottom:20px; font-size:13px;">
+      <div style="font-size:11px; color:var(--text-light); margin-bottom:4px;">Votre email de connexion</div>
+      <div style="font-weight:600; color:#1a3c6e; font-family:monospace;">{{ email }}</div>
+    </div>
+
+    {% if erreur %}
+    <div style="background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; padding:10px 14px; color:#991b1b; font-size:13px; margin-bottom:16px;">
+      {{ erreur }}
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label class="form-label" for="nouveau_mdp">Mot de passe *</label>
+        <div style="position:relative;">
+          <input type="password" name="nouveau_mdp" id="nouveau_mdp"
+            class="form-input"
+            placeholder="10 caractères minimum" autocomplete="new-password"
+            style="padding-right:40px;" required>
+          <button type="button" onclick="toggleMdp('nouveau_mdp', this)"
+            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-light);font-size:14px;" title="Afficher">👁</button>
+        </div>
+        <!-- Indicateur de force -->
+        <div id="force-mdp" style="display:none; margin-top:6px;">
+          <div style="height:4px; background:#e2e8f0; border-radius:2px; overflow:hidden;">
+            <div id="barre-force" style="height:100%; width:0%; transition:width .3s, background .3s; border-radius:2px;"></div>
+          </div>
+          <div id="label-force" style="font-size:11px; color:var(--text-light); margin-top:3px;"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="confirmer_mdp">Confirmer le mot de passe *</label>
+        <input type="password" name="confirmer_mdp" id="confirmer_mdp"
+          class="form-input" placeholder="Répétez le mot de passe"
+          autocomplete="new-password" required>
+        <div id="match-msg" style="display:none; font-size:11px; margin-top:4px;"></div>
+      </div>
+
+      <div style="margin-top:20px;">
+        <button type="submit" id="btn-activer" class="btn btn-primary btn-spinner"
+          style="width:100%;" data-loading="Activation…">
+          Activer mon compte
+        </button>
+      </div>
+    </form>
+
+    <div style="margin-top:16px; text-align:center; font-size:12px; color:var(--text-secondary);">
+      Ce lien est valable 72 heures. En cas de problème,<br>contactez l'huissier qui vous a invité.
+    </div>
+
+  </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+function toggleMdp(id, btn) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.type = el.type === 'password' ? 'text' : 'password';
+  btn.textContent = el.type === 'password' ? '👁' : '🙈';
+}
+
+/* Force du mot de passe */
+(function() {
+  var input = document.getElementById('nouveau_mdp');
+  var barre = document.getElementById('barre-force');
+  var label = document.getElementById('label-force');
+  var wrap  = document.getElementById('force-mdp');
+  if (!input) return;
+  input.addEventListener('input', function() {
+    var v = this.value;
+    if (!v) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    var s = 0;
+    if (v.length >= 10) s++;
+    if (v.length >= 14) s++;
+    if (/[A-Z]/.test(v)) s++;
+    if (/[0-9]/.test(v)) s++;
+    if (/[^A-Za-z0-9]/.test(v)) s++;
+    var pct = Math.min(100, s * 20);
+    var c = pct < 40 ? '#dc2626' : pct < 70 ? '#d97706' : '#1a3c6e';
+    var t = pct < 40 ? 'Faible' : pct < 70 ? 'Moyen' : pct < 100 ? 'Fort' : 'Très fort';
+    barre.style.width = pct + '%'; barre.style.background = c;
+    label.style.color = c; label.textContent = t;
+  });
+})();
+
+/* Vérification de correspondance */
+(function() {
+  var p1 = document.getElementById('nouveau_mdp');
+  var p2 = document.getElementById('confirmer_mdp');
+  var msg = document.getElementById('match-msg');
+  if (!p2) return;
+  p2.addEventListener('input', function() {
+    if (!this.value) { msg.style.display = 'none'; return; }
+    msg.style.display = 'block';
+    if (p1.value === this.value) {
+      msg.textContent = '✓ Mots de passe identiques';
+      msg.style.color = '#134e3a';
+    } else {
+      msg.textContent = '✕ Les mots de passe ne correspondent pas';
+      msg.style.color = '#dc2626';
+    }
+  });
+})();
+</script>
+{% endblock %}
+
+{% endblock %}

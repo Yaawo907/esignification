@@ -1,0 +1,79 @@
+<div class="card" style="margin-bottom:20px; padding:20px 24px;">
+  <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+    <div>
+      <div style="font-size:14px; font-weight:700; color:var(--text-primary);">{{ titre }}</div>
+      <div style="font-size:12px; color:var(--text-secondary);">{{ sous_titre }}</div>
+    </div>
+    {% if b64_actuel %}
+    <span style="background:#dcfce7; color:#166534; border-radius:999px; padding:3px 12px; font-size:11px; font-weight:600;">✓ Enregistré</span>
+    {% else %}
+    <span style="background:#fef3c7; color:#92400e; border-radius:999px; padding:3px 12px; font-size:11px; font-weight:600;">⚠ Non configuré</span>
+    {% endif %}
+  </div>
+
+  <!-- Aperçu si déjà enregistré -->
+  {% if b64_actuel %}
+  <div style="margin-bottom:14px; padding:12px; background:#f8fafb; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; gap:16px;">
+    <img src="{{ b64_actuel }}" alt="Aperçu {{ titre }}"
+         style="max-height:60px; max-width:200px; object-fit:contain; border:1px solid #e2e8f0; border-radius:4px; background:#fff; padding:4px;">
+    <div>
+      <div style="font-size:12px; font-weight:600; color:var(--text-primary);">{{ label_actuel }}</div>
+      <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">Enregistré — cliquez "Redessiner" pour remplacer</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Pad de dessin (masqué si déjà enregistré) -->
+  <div id="zone-pad-{{ slug }}" style="{% if b64_actuel %}display:none;{% endif %}">
+    <div style="position:relative; border:2px solid var(--border); border-radius:8px; background:#fafafa; overflow:hidden; margin-bottom:10px;">
+      <canvas id="canvas-{{ slug }}" width="680" height="150"
+              style="display:block; width:100%; touch-action:none; cursor:crosshair;"></canvas>
+      <div id="ph-{{ slug }}" style="position:absolute; inset:0; display:flex; align-items:center;
+           justify-content:center; pointer-events:none; font-size:13px; color:#ccc; letter-spacing:.04em;">
+        ✍&nbsp; Dessinez {{ titre|lower }} ici
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="effacerPad('{{ slug }}')">✕ Effacer</button>
+      <span id="status-{{ slug }}" style="font-size:12px; color:var(--text-secondary);">Pad vide</span>
+    </div>
+  </div>
+
+  <!-- Formulaire POST -->
+  <form method="post" style="margin-top:14px;" id="form-{{ slug }}">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="{{ action }}">
+    <input type="hidden" name="{{ champ_b64 }}" id="b64-{{ slug }}">
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+      <div class="form-group" style="flex:1; min-width:180px; margin-bottom:0;">
+        <label class="form-label" style="font-size:11px;">Libellé affiché lors du choix</label>
+        <input type="text" name="{{ champ_label }}" class="form-input"
+               value="{{ label_actuel }}" maxlength="80"
+               style="font-size:13px; padding:7px 12px;">
+      </div>
+      <div style="display:flex; gap:8px;">
+        {% if b64_actuel %}
+        <button type="button" class="btn btn-ghost btn-sm"
+                onclick="document.getElementById('zone-pad-{{ slug }}').style.display='block'; this.style.display='none';">
+          ✏ Redessiner
+        </button>
+        {% endif %}
+        <button type="submit" class="btn btn-primary btn-sm" id="btn-save-{{ slug }}"
+                {% if not b64_actuel %}disabled{% endif %}>
+          💾 Enregistrer
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Effacer -->
+  {% if b64_actuel %}
+  <form method="post" style="margin-top:8px; text-align:right;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="{{ effacer_action }}">
+    <button type="submit" class="btn btn-ghost btn-sm"
+            onclick="return confirm('Supprimer {{ titre|lower }} ?');"
+            style="font-size:11px; color:#e53e3e;">🗑 Supprimer</button>
+  </form>
+  {% endif %}
+</div>

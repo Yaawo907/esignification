@@ -32,6 +32,31 @@ class ProfilHuissier(models.Model):
         return f"{self.prenom} {self.nom}"
 
 
+class ParametreSignatureHuissier(models.Model):
+    """Stocke les 3 tampons/signatures visuels de l'huissier (base64 PNG)."""
+    huissier = models.OneToOneField(
+        ProfilHuissier, on_delete=models.CASCADE,
+        related_name='parametres_signature'
+    )
+    # Signature manuscrite seule
+    signature_simple_b64 = models.TextField(blank=True)
+    signature_simple_label = models.CharField(max_length=80, default='Signature simple')
+    # Signature + cachet de l'étude
+    signature_cachet_b64 = models.TextField(blank=True)
+    signature_cachet_label = models.CharField(max_length=80, default='Signature avec cachet')
+    # Cachet seul (tampon de l'étude)
+    cachet_simple_b64 = models.TextField(blank=True)
+    cachet_simple_label = models.CharField(max_length=80, default='Cachet simple')
+
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Paramètres signature huissier'
+
+    def __str__(self):
+        return f"Signatures — {self.huissier}"
+
+
 class ProfilClerc(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profil_clerc')

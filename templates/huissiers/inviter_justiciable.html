@@ -1,1 +1,420 @@
-{% extends 'base/base.html' %}{% block body_class %}dashboard-page{% endblock %}{% block body %}<div class="auth-container" style="max-width:700px;"><div class="auth-card"><h2>Inviter Justiciable</h2><a href="{% url 'huissiers:tableau_de_bord' %}" class="btn btn-ghost">Retour</a></div></div>{% endblock %}
+{% extends 'base/base.html' %}
+{% block title %}Inviter un justiciable{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div>
+        <div class="logo-name">e-Signification</div>
+        <div class="logo-sub">Espace huissier</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link">▦ Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link">✉ Significations</a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link">⌕ Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item active">+ Inviter</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ huissier.nom_complet }}</div>
+        <div class="user-role">{{ huissier.nom_etude }}</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
+
+  <!-- ── Contenu principal ── -->
+  <main class="dashboard-main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">Inviter un justiciable</h1>
+        <div class="topbar-sub">Envoyez une invitation par email pour créer un compte et élire domicile électronique</div>
+      </div>
+      <a href="{% url 'significations:envoyer' %}" class="btn btn-primary spinner-link">✉ Nouvelle signification</a>
+    </header>
+
+    <div class="content-area">
+      <div class="two-col-grid" style="align-items:start;">
+
+        <!-- ── Colonne gauche : formulaire d'invitation ── -->
+        <div>
+
+          <!-- Explication du processus -->
+          <div class="flow-steps" style="margin-bottom:20px;">
+            <div class="flow-step">
+              <div class="flow-dot flow-dot-done">1</div>
+              <div class="flow-label"><strong>Vous invitez</strong>Saisissez l'email</div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-dot">2</div>
+              <div class="flow-label"><strong>Email envoyé</strong>Lien valable 72h</div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-dot">3</div>
+              <div class="flow-label"><strong>Il crée son compte</strong>Élection de domicile</div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-dot">4</div>
+              <div class="flow-label"><strong>Vous signifiez</strong>Acte électronique</div>
+            </div>
+          </div>
+
+          <!-- Formulaire -->
+          <div class="form-card">
+            <div class="card-header">
+              <span class="card-title">Nouvelle invitation</span>
+            </div>
+            <div class="form-card-body">
+
+              <div class="info-box" style="margin-bottom:20px;">
+                <strong>Comment ça fonctionne ?</strong><br>
+                Le justiciable reçoit un email l'invitant à créer son compte sur la plateforme et à définir son
+                <strong>élection de domicile électronique</strong>. Une fois inscrit, vous pourrez lui signifier des actes directement.
+                Le lien d'invitation est valable <strong>72 heures</strong>.
+              </div>
+
+              <form method="post" action="{% url 'huissiers:inviter' %}" id="form-invitation" novalidate>
+                {% csrf_token %}
+
+                <div class="form-group">
+                  <label for="email" class="form-label">
+                    Email du justiciable <span class="required">*</span>
+                  </label>
+                  <input type="email" id="email" name="email" class="form-input"
+                    placeholder="exemple@email.com" required autocomplete="off"
+                    value="{{ request.POST.email|default:'' }}">
+                  <div class="form-hint">
+                    L'invitation sera envoyée à cette adresse. Elle deviendra l'adresse d'élection de domicile du justiciable.
+                  </div>
+                </div>
+
+                <div class="form-row" style="margin-bottom:16px;">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label for="prenom" class="form-label">Prénom <span style="color:var(--text-light);">(optionnel)</span></label>
+                    <input type="text" id="prenom" name="prenom" class="form-input"
+                      placeholder="Prénom du destinataire"
+                      value="{{ request.POST.prenom|default:'' }}" maxlength="100">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label for="nom" class="form-label">Nom <span style="color:var(--text-light);">(optionnel)</span></label>
+                    <input type="text" id="nom" name="nom" class="form-input"
+                      placeholder="Nom du destinataire"
+                      value="{{ request.POST.nom|default:'' }}" maxlength="100">
+                  </div>
+                </div>
+
+                <!-- Récapitulatif avant envoi -->
+                <div id="recap-box" style="display:none;" class="domicile-info" style="margin-bottom:16px;">
+                  <span>📧</span>
+                  <span id="recap-text"></span>
+                </div>
+
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <button type="submit" class="btn btn-primary btn-spinner" id="btn-envoyer"
+                    data-loading="Envoi en cours…">
+                    <span class="btn-text">✉ Envoyer l'invitation</span>
+                    <span class="btn-loader" style="display:none;"></span>
+                  </button>
+                  <a href="{% url 'huissiers:tableau_de_bord' %}" class="btn btn-ghost spinner-link">
+                    Annuler
+                  </a>
+                </div>
+
+              </form>
+            </div>
+          </div>
+
+          <!-- Déjà inscrit ? -->
+          <div class="card" style="margin-top:16px;">
+            <div class="card-header">
+              <span class="card-title">Justiciable déjà inscrit ?</span>
+            </div>
+            <div class="card-body" style="padding:16px 18px;">
+              <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
+                Si le justiciable possède déjà un compte, inutile de l'inviter — signifiez-lui directement un acte.
+              </p>
+              <a href="{% url 'significations:envoyer' %}" class="btn btn-blue spinner-link" style="width:100%; justify-content:center;">
+                ✉ Envoyer une signification directement →
+              </a>
+            </div>
+          </div>
+
+        </div><!-- /col gauche -->
+
+        <!-- ── Colonne droite : historique des invitations ── -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Historique des invitations</span>
+              <span style="font-size:12px; color:var(--text-light);">30 dernières</span>
+            </div>
+
+            {% if invitations %}
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Envoyée le</th>
+                    <th>Statut</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for inv in invitations %}
+                  <tr id="inv-row-{{ inv.uuid }}">
+                    <td>
+                      <div class="td-name" style="font-size:13px;">{{ inv.email_cible }}</div>
+                      {% if inv.justiciable_cree %}
+                      <div class="td-sub">
+                        <span class="badge badge-verified">✓ Compte créé</span>
+                        {{ inv.justiciable_cree.nom_complet }}
+                      </div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div style="font-size:13px;">{{ inv.date_envoi|date:"d/m/Y" }}</div>
+                      <div class="td-sub">{{ inv.date_envoi|date:"H:i" }}</div>
+                    </td>
+                    <td>
+                      {% if inv.utilise %}
+                        <span class="badge badge-acceptee">✓ Utilisée</span>
+                      {% elif inv.date_expiration < now %}
+                        <span class="badge badge-inactif">Expirée</span>
+                      {% else %}
+                        <span class="badge badge-en_attente">En attente</span>
+                        <div class="td-sub" style="margin-top:3px; font-size:11px;">
+                          Expire le {{ inv.date_expiration|date:"d/m H:i" }}
+                        </div>
+                      {% endif %}
+                    </td>
+                    <td style="text-align:right;">
+                      {% if not inv.utilise %}
+                      <button class="btn btn-xs btn-blue btn-renvoyer-inv"
+                        data-url="{% url 'huissiers:renvoyer_invitation' inv.uuid %}"
+                        data-uuid="{{ inv.uuid }}"
+                        data-email="{{ inv.email_cible }}"
+                        title="Renvoyer l'invitation">
+                        ↻ Renvoyer
+                      </button>
+                      {% else %}
+                      <span style="font-size:11px; color:var(--text-light);">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div style="padding:32px; text-align:center; color:var(--text-light);">
+              <div style="font-size:32px; margin-bottom:10px;">📭</div>
+              <div style="font-size:13px;">Aucune invitation envoyée pour le moment.</div>
+              <div style="font-size:12px; margin-top:4px;">Utilisez le formulaire ci-contre pour inviter un justiciable.</div>
+            </div>
+            {% endif %}
+
+          </div><!-- /card historique -->
+
+          <!-- Légende des statuts -->
+          <div style="padding:12px 4px; font-size:12px; color:var(--text-secondary);">
+            <span class="badge badge-en_attente">En attente</span> Invitation envoyée, non encore utilisée&nbsp;&nbsp;
+            <span class="badge badge-acceptee">Utilisée</span> Compte créé&nbsp;&nbsp;
+            <span class="badge badge-inactif">Expirée</span> Délai de 72h dépassé
+          </div>
+
+        </div><!-- /col droite -->
+
+      </div><!-- /two-col-grid -->
+    </div><!-- /content-area -->
+  </main>
+</div>
+
+<!-- ── Styles locaux ── -->
+<style>
+  .two-col-grid { align-items: start; }
+  .form-card { background: var(--bg-white); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+  .form-card .card-header { background: var(--bg-secondary); }
+</style>
+
+<!-- ── Scripts ── -->
+{% block extra_scripts %}
+<script>
+'use strict';
+
+/* ── Récapitulatif dynamique ── */
+(function() {
+  const emailInput = document.getElementById('email');
+  const prenomInput = document.getElementById('prenom');
+  const nomInput = document.getElementById('nom');
+  const recapBox = document.getElementById('recap-box');
+  const recapText = document.getElementById('recap-text');
+
+  function updateRecap() {
+    const email = emailInput ? emailInput.value.trim() : '';
+    const prenom = prenomInput ? prenomInput.value.trim() : '';
+    const nom = nomInput ? nomInput.value.trim() : '';
+
+    if (!email) {
+      if (recapBox) recapBox.style.display = 'none';
+      return;
+    }
+
+    let msg = 'Invitation à envoyer à ';
+    if (prenom || nom) {
+      msg += escapeHtml((prenom + ' ' + nom).trim()) + ' ';
+      msg += '&lt;' + escapeHtml(email) + '&gt;';
+    } else {
+      msg += escapeHtml(email);
+    }
+
+    if (recapText) recapText.innerHTML = msg;
+    if (recapBox) recapBox.style.display = 'flex';
+  }
+
+  [emailInput, prenomInput, nomInput].forEach(function(el) {
+    if (el) el.addEventListener('input', updateRecap);
+  });
+
+  updateRecap();
+})();
+
+
+/* ── Validation email côté client ── */
+(function() {
+  const form = document.getElementById('form-invitation');
+  const emailInput = document.getElementById('email');
+  if (!form || !emailInput) return;
+
+  form.addEventListener('submit', function(e) {
+    const email = emailInput.value.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      e.preventDefault();
+      showFieldError(emailInput, "L'adresse email est obligatoire.");
+      return;
+    }
+    if (!emailRegex.test(email)) {
+      e.preventDefault();
+      showFieldError(emailInput, "Veuillez saisir une adresse email valide.");
+      return;
+    }
+    clearFieldError(emailInput);
+  });
+
+  emailInput.addEventListener('input', function() { clearFieldError(emailInput); });
+
+  function showFieldError(input, msg) {
+    clearFieldError(input);
+    input.style.borderColor = 'var(--red)';
+    const err = document.createElement('div');
+    err.className = 'field-error';
+    err.id = 'err-' + input.id;
+    err.textContent = msg;
+    input.parentNode.appendChild(err);
+    input.focus();
+  }
+
+  function clearFieldError(input) {
+    input.style.borderColor = '';
+    const existing = document.getElementById('err-' + input.id);
+    if (existing) existing.remove();
+  }
+})();
+
+
+/* ── Renvoyer une invitation (AJAX) ── */
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-renvoyer-inv');
+  if (!btn) return;
+
+  const url = btn.dataset.url;
+  const uuid = btn.dataset.uuid;
+  const email = btn.dataset.email;
+
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.innerHTML = '<span class="dl-spin"></span>';
+
+  fetchSecure(url, { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = original;
+      if (data.success) {
+        showToast(data.message, 'success');
+        /* Mettre à jour la date d'expiration dans la ligne */
+        const row = document.getElementById('inv-row-' + uuid);
+        if (row && data.nouvelle_expiration) {
+          const badgeCell = row.cells[2];
+          if (badgeCell) {
+            const badge = document.createElement('span');
+            badge.className = 'badge badge-en_attente';
+            badge.textContent = 'En attente';
+            const sub = document.createElement('div');
+            sub.className = 'td-sub';
+            sub.style.marginTop = '3px';
+            sub.style.fontSize = '11px';
+            sub.textContent = 'Expire le ' + escapeHtml(data.nouvelle_expiration);
+            badgeCell.innerHTML = '';
+            badgeCell.appendChild(badge);
+            badgeCell.appendChild(sub);
+          }
+        }
+      } else {
+        showToast('Erreur : ' + (data.error || 'Impossible de renvoyer.'), 'error');
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = original;
+      showToast('Erreur réseau. Veuillez réessayer.', 'error');
+    });
+});
+
+
+/* ── Utilitaire toast ── */
+function showToast(message, type) {
+  const container = document.getElementById('messages-container') || createToastContainer();
+  const div = document.createElement('div');
+  div.className = 'alert alert-' + (type === 'success' ? 'success' : 'error');
+  div.setAttribute('role', 'alert');
+
+  const text = document.createTextNode(message);
+  div.appendChild(text);
+
+  const close = document.createElement('button');
+  close.className = 'alert-close';
+  close.setAttribute('aria-label', 'Fermer');
+  close.textContent = '×';
+  close.addEventListener('click', function() { div.remove(); });
+  div.appendChild(close);
+
+  container.appendChild(div);
+  setTimeout(function() {
+    div.style.transition = 'opacity .4s';
+    div.style.opacity = '0';
+    setTimeout(function() { div.remove(); }, 400);
+  }, 5000);
+}
+
+function createToastContainer() {
+  const c = document.createElement('div');
+  c.id = 'messages-container';
+  document.body.appendChild(c);
+  return c;
+}
+</script>
+{% endblock %}
+
+{% endblock %}
