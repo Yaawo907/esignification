@@ -77,6 +77,7 @@ def rechercher_justiciable(request):
 @login_required
 @huissier_required
 def liste_significations(request):
+    from django.core.paginator import Paginator
     huissier = (request.user.profil_huissier if request.user.role == User.HUISSIER
                 else request.user.profil_clerc.huissier)
     statut = request.GET.get('statut', '')
@@ -86,14 +87,34 @@ def liste_significations(request):
         qs = qs.filter(statut=statut)
     if periode:
         from django.utils import timezone
-        from datetime import timedelta
-        today = timezone.now()
-        if periode == 'mois':
-            qs = qs.filter(date_envoi__gte=today - timedelta(days=30))
-        elif periode == '3mois':
-            qs = qs.filter(date_envoi__gte=today - timedelta(days=90))
+        from datetime import timedelta, date
+        now = timezone.now()
+        today = now.date()
+        if periode == 'semaine':
+            debut = today - timedelta(days=today.weekday())  # lundi de cette semaine
+            qs = qs.filter(date_envoi__date__gte=debut)
+        elif periode == 'mois':
+            qs = qs.filter(date_envoi__year=today.year, date_envoi__month=today.month)
+        elif periode == 'mois_dernier':
+            if today.month == 1:
+                qs = qs.filter(date_envoi__year=today.year - 1, date_envoi__month=12)
+            else:
+                qs = qs.filter(date_envoi__year=today.year, date_envoi__month=today.month - 1)
+        elif periode == 'trimestre':
+            debut = today - timedelta(days=90)
+            qs = qs.filter(date_envoi__date__gte=debut)
+        elif periode == 'annee':
+            qs = qs.filter(date_envoi__year=today.year)
+        elif periode == 'annee_derniere':
+            qs = qs.filter(date_envoi__year=today.year - 1)
+    paginator = Paginator(qs.order_by('-date_envoi'), 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    params = request.GET.copy()
+    params.pop('page', None)
     return render(request, 'huissiers/liste_significations.html', {
-        'significations': qs.order_by('-date_envoi'),
+        'significations': page_obj,
+        'page_obj': page_obj,
+        'params_str': params.urlencode(),
         'statut_filtre': statut, 'periode': periode,
         'STATUTS': Signification.STATUT_CHOICES,
     })
@@ -152,15 +173,22 @@ def inviter_justiciable(request):
         messages.success(request, f"Invitation envoyée à {email}. Le lien est valable 72 heures.")
         return redirect('huissiers:inviter')
 
-    # Historique des invitations récentes de cet huissier
-    invitations = InvitationJusticiable.objects.filter(
+    # Historique des invitations de cet huissier (paginé 20/page)
+    from django.core.paginator import Paginator
+    qs_inv = InvitationJusticiable.objects.filter(
         huissier=huissier
-    ).order_by('-date_envoi').select_related('justiciable_cree__user')[:30]
+    ).order_by('-date_envoi').select_related('justiciable_cree__user')
+    paginator = Paginator(qs_inv, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    params = request.GET.copy()
+    params.pop('page', None)
 
     now = timezone.now()
     return render(request, 'huissiers/inviter_justiciable.html', {
         'huissier': huissier,
-        'invitations': invitations,
+        'invitations': page_obj,
+        'page_obj': page_obj,
+        'params_str': params.urlencode(),
         'now': now,
     })
 
@@ -225,14 +253,21 @@ def renvoyer_invitation_justiciable(request, uuid):
 @huissier_required
 def liste_clercs(request):
     """Liste des clercs de l'étude — accessible uniquement à l'huissier titulaire."""
+    from django.core.paginator import Paginator
     if request.user.role != User.HUISSIER:
         raise Http404
     huissier = request.user.profil_huissier
     from .models import ProfilClerc
-    clercs = ProfilClerc.objects.filter(huissier=huissier).select_related('user').order_by('nom', 'prenom')
+    qs = ProfilClerc.objects.filter(huissier=huissier).select_related('user').order_by('nom', 'prenom')
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    params = request.GET.copy()
+    params.pop('page', None)
     return render(request, 'huissiers/liste_clercs.html', {
         'huissier': huissier,
-        'clercs': clercs,
+        'clercs': page_obj,
+        'page_obj': page_obj,
+        'params_str': params.urlencode(),
     })
 
 
@@ -376,8 +411,15 @@ def liste_demandes_modification(request):
     nb_en_attente = DemandeModificationProfil.objects.filter(
         huissier=huissier, statut='en_attente'
     ).count()
+    from django.core.paginator import Paginator
+    paginator = Paginator(demandes, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    params = request.GET.copy()
+    params.pop('page', None)
     return render(request, 'huissiers/liste_demandes_modification.html', {
-        'demandes': demandes,
+        'demandes': page_obj,
+        'page_obj': page_obj,
+        'params_str': params.urlencode(),
         'statut_filtre': statut_filtre,
         'nb_en_attente': nb_en_attente,
     })
@@ -506,13 +548,25 @@ def parametres_signatures(request):
     from .models import ParametreSignatureHuissier
     params, _ = ParametreSignatureHuissier.objects.get_or_create(huissier=huissier)
 
+    PREFIXES_IMAGE_VALIDES = (
+        'data:image/png;base64,',
+        'data:image/jpeg;base64,',
+        'data:image/jpg;base64,',
+        'data:image/svg+xml;base64,',
+        'data:image/webp;base64,',
+        'data:image/gif;base64,',
+    )
+
+    def _valider_b64(valeur):
+        return valeur and any(valeur.startswith(p) for p in PREFIXES_IMAGE_VALIDES)
+
     if request.method == 'POST':
         action = request.POST.get('action', '')
 
         if action == 'enregistrer_signature_simple':
             b64 = request.POST.get('sig_simple_b64', '').strip()
             label = escape(request.POST.get('sig_simple_label', '').strip()) or 'Signature simple'
-            if b64 and b64.startswith('data:image/png;base64,'):
+            if _valider_b64(b64):
                 params.signature_simple_b64 = b64
                 params.signature_simple_label = label[:80]
                 params.save(update_fields=['signature_simple_b64', 'signature_simple_label'])
@@ -520,12 +574,12 @@ def parametres_signatures(request):
                 messages.success(request, "Signature simple enregistrée.")
             else:
                 from django.contrib import messages
-                messages.error(request, "Signature invalide.")
+                messages.error(request, "Signature invalide — veuillez dessiner ou importer une image.")
 
         elif action == 'enregistrer_signature_cachet':
             b64 = request.POST.get('sig_cachet_b64', '').strip()
             label = escape(request.POST.get('sig_cachet_label', '').strip()) or 'Signature avec cachet'
-            if b64 and b64.startswith('data:image/png;base64,'):
+            if _valider_b64(b64):
                 params.signature_cachet_b64 = b64
                 params.signature_cachet_label = label[:80]
                 params.save(update_fields=['signature_cachet_b64', 'signature_cachet_label'])
@@ -533,12 +587,12 @@ def parametres_signatures(request):
                 messages.success(request, "Signature avec cachet enregistrée.")
             else:
                 from django.contrib import messages
-                messages.error(request, "Signature invalide.")
+                messages.error(request, "Signature invalide — veuillez dessiner ou importer une image.")
 
         elif action == 'enregistrer_cachet_simple':
             b64 = request.POST.get('cachet_simple_b64', '').strip()
             label = escape(request.POST.get('cachet_simple_label', '').strip()) or 'Cachet simple'
-            if b64 and b64.startswith('data:image/png;base64,'):
+            if _valider_b64(b64):
                 params.cachet_simple_b64 = b64
                 params.cachet_simple_label = label[:80]
                 params.save(update_fields=['cachet_simple_b64', 'cachet_simple_label'])
@@ -546,7 +600,7 @@ def parametres_signatures(request):
                 messages.success(request, "Cachet simple enregistré.")
             else:
                 from django.contrib import messages
-                messages.error(request, "Cachet invalide.")
+                messages.error(request, "Cachet invalide — veuillez dessiner ou importer une image.")
 
         elif action in ('effacer_signature_simple', 'effacer_signature_cachet', 'effacer_cachet_simple'):
             champ_map = {

@@ -151,3 +151,38 @@ def envoyer_recuperation_mdp(email: str, token_brut: str, langue: str = 'fr'):
       <p style="color:#888;font-size:13px;">Ce lien est valable 2 heures. Si vous n'avez pas fait cette demande, ignorez cet email.</p>
     </div>"""
     return envoyer_email(email, sujet, corps)
+
+
+def envoyer_yousign_expiree(signification, raison: str = 'expired'):
+    """
+    Notifie l'huissier que sa demande de signature Yousign a échoué/expiré.
+    L'acte reste en statut attente_signature — l'huissier peut basculer en traditionnel.
+    """
+    from administration.models import ConfigurationPlateforme
+    config = ConfigurationPlateforme.get()
+    huissier = signification.huissier
+    libelles = {
+        'expired': 'a expiré (7 jours sans signature)',
+        'canceled': 'a été annulée',
+        'rejected': 'a été refusée',
+    }
+    libelle = libelles.get(raison, 'a échoué')
+    sujet = f"⚠ Signature électronique {libelle} — {signification.reference}"
+    corps = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+      <h2 style="color:#a32d2d;">Signature électronique — action requise</h2>
+      <p>Maître <strong>{huissier.prenom} {huissier.nom}</strong>,</p>
+      <p>La demande de signature électronique (Yousign) pour l'acte
+      <strong>{signification.reference}</strong> {libelle}.</p>
+      <p>L'acte n'a pas encore été transmis au destinataire.</p>
+      <p>Veuillez vous connecter à la plateforme pour :</p>
+      <ul>
+        <li>Basculer cet acte en signification traditionnelle (remise en mains propres), ou</li>
+        <li>Contacter l'administrateur pour relancer une demande de signature.</li>
+      </ul>
+      <p style="color:#888;font-size:12px;">
+        Référence : {signification.reference}<br>
+        Destinataire : {signification.justiciable.nom_complet}
+      </p>
+    </div>"""
+    return envoyer_email(huissier.user.email, sujet, corps)

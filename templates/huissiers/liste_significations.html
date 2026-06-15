@@ -42,7 +42,7 @@
     <header class="topbar">
       <div>
         <h1 class="topbar-title">Significations</h1>
-        <div class="topbar-sub">{{ significations|length }} résultat{% if significations|length != 1 %}s{% endif %}</div>
+        <div class="topbar-sub">{{ page_obj.paginator.count }} résultat{% if page_obj.paginator.count != 1 %}s{% endif %}</div>
       </div>
       <div class="topbar-actions">
         <a href="{% url 'significations:envoyer' %}" class="btn btn-primary spinner-link">✉ Nouvelle signification</a>
@@ -53,42 +53,47 @@
 
       <!-- Filtres -->
       <div class="card" style="margin-bottom:16px;">
-        <div style="padding:14px 18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
 
-          <!-- Filtre statut -->
-          <form method="get" id="form-filtres" style="display:contents;">
-            <div style="display:flex; gap:6px; flex-wrap:wrap; flex:1;">
-              {% for val, label in STATUTS %}
-              <a href="?statut={{ val }}{% if periode %}&periode={{ periode }}{% endif %}"
-                class="btn btn-sm {% if statut_filtre == val %}btn-primary{% else %}btn-ghost{% endif %}">
-                {{ label }}
-              </a>
-              {% endfor %}
-              {% if statut_filtre %}
-              <a href="?{% if periode %}periode={{ periode }}{% endif %}" class="btn btn-sm btn-ghost" style="color:var(--red);">
-                ✕ Effacer
-              </a>
-              {% endif %}
-            </div>
-
-            <!-- Filtre période -->
-            <select name="periode" onchange="document.getElementById('form-filtres').submit()"
-              class="form-input" style="width:auto; padding:6px 10px; font-size:12px;">
-              <input type="hidden" name="statut" value="{{ statut_filtre }}">
-              <option value="" {% if not periode %}selected{% endif %}>Toute la période</option>
-              <option value="mois" {% if periode == 'mois' %}selected{% endif %}>Ce mois</option>
-              <option value="3mois" {% if periode == '3mois' %}selected{% endif %}>3 derniers mois</option>
+        <!-- Ligne 1 : Période + Recherche -->
+        <div style="padding:12px 18px; display:flex; gap:10px; align-items:center; border-bottom:1px solid var(--border);">
+          <span style="font-size:12px; color:var(--text-light); white-space:nowrap;">Période :</span>
+          <form method="get" id="form-periode" style="display:flex; align-items:center; gap:6px; flex:1;">
+            <input type="hidden" name="statut" value="{{ statut_filtre }}">
+            <select name="periode" onchange="document.getElementById('form-periode').submit()"
+              class="form-input" style="width:180px; padding:6px 10px; font-size:13px;">
+              <option value=""               {% if not periode %}selected{% endif %}>Toute la période</option>
+              <option value="semaine"        {% if periode == 'semaine' %}selected{% endif %}>Cette semaine</option>
+              <option value="mois"           {% if periode == 'mois' %}selected{% endif %}>Ce mois</option>
+              <option value="mois_dernier"   {% if periode == 'mois_dernier' %}selected{% endif %}>Le mois dernier</option>
+              <option value="trimestre"      {% if periode == 'trimestre' %}selected{% endif %}>Dernier trimestre</option>
+              <option value="annee"          {% if periode == 'annee' %}selected{% endif %}>Année en cours</option>
+              <option value="annee_derniere" {% if periode == 'annee_derniere' %}selected{% endif %}>Année dernière</option>
             </select>
           </form>
-
           <!-- Recherche client-side -->
           <div style="position:relative;">
             <input type="text" id="search-sig" class="form-input" placeholder="Rechercher…"
-              style="width:200px; padding-left:30px; font-size:12px;" autocomplete="off">
-            <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:12px; pointer-events:none;">⌕</span>
+              style="width:220px; padding-left:30px; font-size:13px;" autocomplete="off">
+            <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:13px; pointer-events:none;">⌕</span>
           </div>
-
         </div>
+
+        <!-- Ligne 2 : Filtres statut -->
+        <div style="padding:10px 18px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <span style="font-size:12px; color:var(--text-light); white-space:nowrap; margin-right:2px;">Statut :</span>
+          {% for val, label in STATUTS %}
+          <a href="?statut={{ val }}{% if periode %}&periode={{ periode }}{% endif %}"
+            class="btn btn-sm {% if statut_filtre == val %}btn-primary{% else %}btn-ghost{% endif %}">
+            {{ label }}
+          </a>
+          {% endfor %}
+          {% if statut_filtre %}
+          <a href="?{% if periode %}periode={{ periode }}{% endif %}" class="btn btn-sm btn-ghost" style="color:var(--red); margin-left:4px;">
+            ✕ Tout afficher
+          </a>
+          {% endif %}
+        </div>
+
       </div>
 
       <!-- Tableau -->
@@ -154,9 +159,19 @@
                 <td style="text-align:right;">
                   <div style="display:flex; gap:6px; justify-content:flex-end;">
 
+                    {% if sig.fichier_chiffre %}
+                    <a href="{% url 'significations:telecharger_acte' sig.uuid %}"
+                      target="_blank" rel="noopener"
+                      class="btn btn-xs btn-ghost spinner-link" data-loading="Ouverture…"
+                      title="Ouvrir l'acte">
+                      📋 Acte
+                    </a>
+                    {% endif %}
+
                     {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
                       {% if sig.certificat %}
                       <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}"
+                        target="_blank" rel="noopener"
                         class="btn btn-xs btn-blue spinner-link" data-loading="Téléchargement…"
                         title="Télécharger le certificat">
                         📄 Certificat
@@ -166,6 +181,7 @@
 
                     {% if sig.statut == 'repondu' and sig.reponse %}
                       <a href="{% url 'significations:voir_reponse' sig.uuid %}"
+                        target="_blank" rel="noopener"
                         class="btn btn-xs btn-green spinner-link"
                         title="Voir la réponse du justiciable">
                         ↩ Réponse
@@ -174,6 +190,7 @@
 
                     {% if sig.statut == 'non_delivree' or sig.statut == 'relance_2' %}
                       <a href="{% url 'significations:telecharger_constat' sig.uuid %}"
+                        target="_blank" rel="noopener"
                         class="btn btn-xs btn-ghost spinner-link" data-loading="Téléchargement…"
                         title="Télécharger le constat de non-réception">
                         📋 Constat
@@ -215,6 +232,8 @@
         <div id="no-search-sig" style="display:none; text-align:center; padding:28px; color:var(--text-light); font-size:13px;">
           Aucune signification ne correspond à cette recherche.
         </div>
+
+        {% include 'base/_pagination.html' %}
 
       </div><!-- /card -->
 

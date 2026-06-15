@@ -58,9 +58,14 @@ def envoyer_signification(request):
             justiciable = ProfilJusticiable.objects.get(uuid=j_uuid)
         except ProfilJusticiable.DoesNotExist:
             raise Http404
-        # Récupérer et valider la signature visuelle (base64 PNG)
+        # Récupérer et valider la signature visuelle (tout format image base64)
         signature_b64 = request.POST.get('signature_b64', '').strip()
-        if not signature_b64 or not signature_b64.startswith('data:image/png;base64,'):
+        prefixes_valides = (
+            'data:image/png;base64,', 'data:image/jpeg;base64,',
+            'data:image/jpg;base64,', 'data:image/svg+xml;base64,',
+            'data:image/webp;base64,', 'data:image/gif;base64,',
+        )
+        if not signature_b64 or not any(signature_b64.startswith(p) for p in prefixes_valides):
             from django.contrib import messages
             messages.error(request, "Veuillez apposer votre signature avant d'envoyer l'acte.")
             return redirect(request.path)
@@ -70,6 +75,14 @@ def envoyer_signification(request):
         hash_acte = hash_fichier(contenu)
         contenu_chiffre = chiffrer_fichier(contenu)
         huissier = request.user.profil_huissier if hasattr(request.user, 'profil_huissier') else request.user.profil_clerc.huissier
+
+        from administration.models import ConfigurationPlateforme as _CP
+        yousign_actif = _CP.get().yousign_active
+
+        # Statut initial : si Yousign actif, l'acte attend la signature de l'huissier
+        statut_initial = (Signification.STATUT_ATTENTE_SIGNATURE if yousign_actif
+                         else Signification.STATUT_EN_ATTENTE)
+
         sig = Signification.objects.create(
             huissier=huissier,
             expediteur=request.user,
@@ -80,17 +93,42 @@ def envoyer_signification(request):
             necessite_reponse=necessite_reponse,
             hash_acte=hash_acte,
             signature_huissier_b64=signature_b64,
+            statut=statut_initial,
         )
-        # Envoyer l'email au justiciable
-        from securite.tokens import creer_token_activation
-        from accounts.models import TokenActivation
-        token_accepter, _ = creer_token_activation(justiciable.email_domicile, TokenActivation.MFA_CODE, {'sig_uuid': str(sig.uuid), 'action': 'accepter'}, heures=72)
-        token_refuser, _ = creer_token_activation(justiciable.email_domicile, TokenActivation.MFA_CODE, {'sig_uuid': str(sig.uuid), 'action': 'refuser'}, heures=72)
-        from notifications.service import envoyer_signification as notif_sig
-        notif_sig(justiciable, sig, token_accepter, token_refuser)
-        journaliser(request.user, 'signification_envoyee', 'Signification', sig.uuid, request=request)
+
         from django.contrib import messages
-        messages.success(request, f"Signification {sig.reference} envoyée avec succès.")
+
+        if yousign_actif:
+            # ── FLUX YOUSIGN ──
+            # L'acte n'est PAS encore envoyé au justiciable.
+            # Yousign envoie un OTP à l'huissier pour signer l'acte.
+            # Dès que l'huissier signe, le webhook déclenche l'envoi au justiciable.
+            yousign_ok = _lancer_yousign_si_actif(sig, contenu)
+            if yousign_ok:
+                journaliser(request.user, 'signification_attente_signature_yousign',
+                            'Signification', sig.uuid, request=request)
+                messages.success(
+                    request,
+                    f"Acte {sig.reference} préparé. Vérifiez votre email : Yousign vous a envoyé "
+                    f"un lien pour signer électroniquement. L'acte sera transmis au justiciable "
+                    f"dès votre signature."
+                )
+            else:
+                # Échec Yousign : fallback envoi direct
+                sig.statut = Signification.STATUT_EN_ATTENTE
+                sig.save(update_fields=['statut'])
+                _envoyer_au_justiciable(sig, justiciable)
+                journaliser(request.user, 'signification_envoyee', 'Signification', sig.uuid, request=request)
+                messages.warning(
+                    request,
+                    f"Signification {sig.reference} envoyée directement (Yousign indisponible)."
+                )
+        else:
+            # ── FLUX CLASSIQUE ──
+            _envoyer_au_justiciable(sig, justiciable)
+            journaliser(request.user, 'signification_envoyee', 'Signification', sig.uuid, request=request)
+            messages.success(request, f"Signification {sig.reference} envoyée avec succès.")
+
         return redirect('huissiers:tableau_de_bord')
     # Charger les signatures enregistrées de l'huissier
     from huissiers.models import ParametreSignatureHuissier
@@ -125,9 +163,12 @@ def repondre_signification(request, uuid):
         sig.save(update_fields=['statut', 'date_acceptation'])
         _generer_certificat(sig)
         journaliser(sig.justiciable.user, 'signification_acceptee', 'Signification', sig.uuid)
-        # Rediriger vers connexion puis tableau de bord
+        # Rediriger vers connexion avec email pré-rempli
         request.session['sig_acceptee_ref'] = sig.reference
-        return redirect(f"/connexion/?next=/justiciable/")
+        email_justiciable = sig.justiciable.user.email
+        from urllib.parse import urlencode
+        params = urlencode({'next': '/justiciable/', 'email': email_justiciable})
+        return redirect(f"/connexion/?{params}")
     elif action == 'refuser':
         sig.statut = Signification.STATUT_REFUSEE
         sig.date_refus = timezone.now()
@@ -283,42 +324,51 @@ def _generer_pdf_certificat(signification, certificat):
             c.drawString(40, y - 2, f"Decret : {config.decret_reference[:120]}")
 
     # ── Signature visuelle de l'huissier ────────────────────────────────────
-    if signification.signature_huissier_b64 and signification.signature_huissier_b64.startswith('data:image/png;base64,'):
+    _PREFIXES_IMG = (
+        'data:image/png;base64,', 'data:image/jpeg;base64,',
+        'data:image/jpg;base64,', 'data:image/webp;base64,',
+        'data:image/gif;base64,', 'data:image/svg+xml;base64,',
+    )
+    if signification.signature_huissier_b64 and any(
+            signification.signature_huissier_b64.startswith(p) for p in _PREFIXES_IMG):
         try:
             import base64
             from PIL import Image as PilImage
             b64_data = signification.signature_huissier_b64.split(',', 1)[1]
             img_bytes = base64.b64decode(b64_data)
-            pil_img = PilImage.open(io.BytesIO(img_bytes)).convert('RGBA')
-            # Fond blanc pour transparence
+            pil_img = PilImage.open(io.BytesIO(img_bytes))
+            if pil_img.mode != 'RGBA':
+                pil_img = pil_img.convert('RGBA')
             bg = PilImage.new('RGBA', pil_img.size, (255, 255, 255, 255))
             bg.paste(pil_img, mask=pil_img.split()[3])
             sig_buf = io.BytesIO()
             bg.convert('RGB').save(sig_buf, format='PNG')
             sig_buf.seek(0)
             sig_img = ImageReader(sig_buf)
-            # Zone de signature : à droite, au-dessus du pied de page
             sig_w, sig_h = 160, 55
             sig_x = w - 40 - sig_w
             sig_y_base = y - 60 if y > 100 else 55
-            # Cadre
             c.setStrokeColorRGB(0.10, 0.24, 0.43)
             c.setLineWidth(0.8)
             c.rect(sig_x - 4, sig_y_base - 4, sig_w + 8, sig_h + 22, stroke=1, fill=0)
-            # Label
             c.setFillColorRGB(0.10, 0.24, 0.43)
             c.setFont("Helvetica-Bold", 7)
             c.drawString(sig_x, sig_y_base + sig_h + 6, "Signature de l'huissier instrumentaire :")
-            # Image signature
             c.drawImage(sig_img, sig_x, sig_y_base, width=sig_w, height=sig_h,
                         preserveAspectRatio=True, mask='auto')
-            # Nom sous la signature
             c.setFont("Helvetica-Oblique", 7)
             c.setFillColorRGB(0.3, 0.3, 0.3)
             c.drawCentredString(sig_x + sig_w / 2, sig_y_base - 8,
                                 f"Me {signification.huissier.prenom} {signification.huissier.nom}")
         except Exception:
-            pass  # Signature absente ou corrompue — on continue sans
+            pass
+
+    # Mention Yousign sur le certificat si signature complète
+    if signification.yousign_statut == 'done':
+        c.setFillColorRGB(0.05, 0.45, 0.15)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(w / 2, 62,
+            "✓ Acte signé numériquement (Signature Électronique Avancée — Yousign)")
 
     # ── Mention d'authenticité ───────────────────────────────────────────────
     c.setFillColorRGB(0.10, 0.24, 0.43)
@@ -349,12 +399,10 @@ def telecharger_acte(request, uuid):
     """Télécharge un acte déchiffré — justiciable (acte reçu) ou huissier/clerc (acte envoyé)"""
     user = request.user
     if _require_justiciable(user):
-        # Le justiciable ne peut télécharger que si la signification lui est adressée et acceptée
         sig = get_object_or_404(Signification, uuid=uuid, justiciable=user.profil_justiciable)
         if sig.statut not in [Signification.STATUT_ACCEPTEE, Signification.STATUT_REPONDU]:
             raise Http404
     elif _require_huissier(user):
-        # L'huissier/clerc peut télécharger tout acte de son étude
         from accounts.models import User as _User
         huissier = (user.profil_huissier if user.role == _User.HUISSIER
                     else user.profil_clerc.huissier)
@@ -428,6 +476,7 @@ def basculer_traditionnel(request, uuid):
     if sig.huissier != h:
         raise Http404
     if sig.statut not in [Signification.STATUT_EN_ATTENTE,
+                          Signification.STATUT_ATTENTE_SIGNATURE,
                           Signification.STATUT_RELANCE_1,
                           Signification.STATUT_RELANCE_2]:
         from django.contrib import messages
@@ -466,7 +515,6 @@ def telecharger_constat(request, uuid):
 def telecharger_certificat(request, uuid):
     cert = get_object_or_404(CertificatSignification, uuid=uuid)
     sig = cert.signification
-    # Vérifier que l'utilisateur a le droit
     user = request.user
     from accounts.models import User as U
     if user.role == U.JUSTICIABLE and sig.justiciable != user.profil_justiciable:
@@ -480,3 +528,130 @@ def telecharger_certificat(request, uuid):
     response = HttpResponse(contenu, content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="certificat_{sig.reference}.pdf"'
     return response
+
+
+
+# ─────────────────────────────────────────────────────────────
+#  Yousign — helpers
+# ─────────────────────────────────────────────────────────────
+
+def _envoyer_au_justiciable(sig, justiciable):
+    """Crée les tokens accepter/refuser et notifie le justiciable par email."""
+    from securite.tokens import creer_token_activation
+    from accounts.models import TokenActivation
+    from notifications.service import envoyer_signification as notif_sig
+    token_accepter, _ = creer_token_activation(
+        justiciable.email_domicile, TokenActivation.MFA_CODE,
+        {'sig_uuid': str(sig.uuid), 'action': 'accepter'}, heures=72,
+    )
+    token_refuser, _ = creer_token_activation(
+        justiciable.email_domicile, TokenActivation.MFA_CODE,
+        {'sig_uuid': str(sig.uuid), 'action': 'refuser'}, heures=72,
+    )
+    notif_sig(justiciable, sig, token_accepter, token_refuser)
+
+
+def _lancer_yousign_si_actif(signification, pdf_bytes) -> bool:
+    """
+    Lance la demande de signature Yousign pour l'huissier.
+    Retourne True si la demande a été créée avec succès, False sinon.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from .yousign_service import creer_demande_signature
+        sig_req_id = creer_demande_signature(signification, pdf_bytes)
+        journaliser(None, 'yousign_demande_creee', 'Signification', signification.uuid,
+                    description=f"Signature request Yousign : {sig_req_id}")
+        return True
+    except Exception as e:
+        logger.error("Yousign : echec pour %s — %s", signification.reference, e)
+        return False
+
+
+# ─────────────────────────────────────────────────────────────
+#  Yousign — Webhook
+# ─────────────────────────────────────────────────────────────
+
+from django.views.decorators.csrf import csrf_exempt
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def webhook_yousign(request):
+    import json as _json
+    import logging
+    logger = logging.getLogger(__name__)
+
+    payload_bytes = request.body
+    sig_header = request.headers.get('X-Yousign-Signature-256', '')
+
+    try:
+        from .yousign_service import valider_webhook
+        if not valider_webhook(payload_bytes, sig_header):
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Signature invalide")
+    except Exception as e:
+        logger.error("Webhook Yousign : erreur validation — %s", e)
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Erreur validation")
+
+    try:
+        data = _json.loads(payload_bytes)
+    except Exception:
+        from django.http import HttpResponseBadRequest
+        return HttpResponseBadRequest("JSON invalide")
+
+    event_name = data.get('event_name', '')
+    sig_req_id = data.get('data', {}).get('signature_request', {}).get('id', '')
+
+    logger.info("Webhook Yousign : %s — request_id=%s", event_name, sig_req_id)
+
+    if not sig_req_id:
+        return HttpResponse(status=200)
+
+    try:
+        sig = Signification.objects.get(yousign_signature_request_id=sig_req_id)
+    except Signification.DoesNotExist:
+        return HttpResponse(status=200)
+
+    if event_name == 'signature_request.done':
+        # 1. Télécharger le PDF signé et le stocker (remplace l'original)
+        try:
+            from .yousign_service import telecharger_document_signe
+            pdf_signe = telecharger_document_signe(sig_req_id)
+            sig.fichier_chiffre = chiffrer_fichier(pdf_signe)
+        except Exception as e:
+            logger.error("Webhook Yousign : PDF signe non recupere — %s", e)
+
+        # 2. Passer le statut en attente (prêt à être reçu par le justiciable)
+        sig.yousign_statut = 'done'
+        sig.statut = Signification.STATUT_EN_ATTENTE
+        sig.save(update_fields=['yousign_statut', 'statut', 'fichier_chiffre'])
+
+        journaliser(None, 'yousign_signature_done', 'Signification', sig.uuid,
+                    description=f"Signature Yousign complete : {sig_req_id}")
+
+        # 3. Envoyer maintenant l'acte signé au justiciable
+        try:
+            _envoyer_au_justiciable(sig, sig.justiciable)
+            journaliser(None, 'signification_envoyee_apres_signature', 'Signification', sig.uuid,
+                        description="Acte transmis au justiciable après signature Yousign")
+        except Exception as e:
+            logger.error("Webhook Yousign : erreur envoi justiciable — %s", e)
+
+    elif event_name in ('signature_request.expired', 'signature_request.canceled',
+                        'signature_request.rejected'):
+        nouveau_statut = event_name.split('.')[1]
+        sig.yousign_statut = nouveau_statut
+        sig.save(update_fields=['yousign_statut'])
+        journaliser(None, f'yousign_{nouveau_statut}', 'Signification', sig.uuid,
+                    description=f"Yousign {nouveau_statut} : {sig_req_id}")
+        # Notifier l'huissier que la signature a échoué/expiré
+        try:
+            from notifications.service import envoyer_yousign_expiree
+            envoyer_yousign_expiree(sig, nouveau_statut)
+        except Exception as e:
+            logger.error("Webhook Yousign : notification echec huissier — %s", e)
+
+    return HttpResponse(status=200)

@@ -34,6 +34,17 @@ class ConfigurationPlateforme(models.Model):
     certigna_seuil_alerte_jetons = models.IntegerField(default=20)
     certigna_jetons_restants = models.IntegerField(default=0)
 
+    # Yousign — signature électronique avancée (AES)
+    yousign_active = models.BooleanField(default=False)
+    yousign_mode = models.CharField(
+        max_length=12, default='sandbox',
+        choices=[('sandbox', 'Sandbox (test)'), ('production', 'Production')],
+    )
+    yousign_api_key_chiffre = models.CharField(max_length=500, blank=True,
+        help_text='Clé API Yousign — chiffrée AES-256 en base')
+    yousign_webhook_secret_chiffre = models.CharField(max_length=500, blank=True,
+        help_text='Secret webhook Yousign pour valider les callbacks')
+
     class Meta:
         verbose_name = 'Configuration plateforme'
 
@@ -139,9 +150,8 @@ class PisteAudit(models.Model):
     date = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Piste d\'audit'
+        verbose_name = "Piste d'audit"
         ordering = ['-date']
-        # Lecture seule — pas de modification ni suppression
 
     def __str__(self):
         return f"{self.action} — {self.user_email} — {self.date}"

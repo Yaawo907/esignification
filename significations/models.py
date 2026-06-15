@@ -6,6 +6,7 @@ from accounts.models import User
 
 class Signification(models.Model):
     STATUT_EN_ATTENTE = 'en_attente'
+    STATUT_ATTENTE_SIGNATURE = 'attente_signature'   # Yousign : en attente de signature huissier
     STATUT_ACCEPTEE = 'acceptee'
     STATUT_REFUSEE = 'refusee'
     STATUT_RELANCE_1 = 'relance_1'
@@ -15,6 +16,7 @@ class Signification(models.Model):
     STATUT_REPONDU = 'repondu'
 
     STATUT_CHOICES = [
+        (STATUT_ATTENTE_SIGNATURE, 'En attente de signature huissier'),
         (STATUT_EN_ATTENTE, 'En attente'),
         (STATUT_ACCEPTEE, 'Acceptée'),
         (STATUT_REFUSEE, 'Refusée'),
@@ -55,6 +57,12 @@ class Signification(models.Model):
 
     # Motif refus
     motif_refus = models.TextField(blank=True)
+
+    # Yousign — signature électronique avancée (optionnel selon config admin)
+    yousign_signature_request_id = models.CharField(max_length=100, blank=True, db_index=True,
+        help_text='ID de la demande de signature Yousign')
+    yousign_statut = models.CharField(max_length=30, blank=True,
+        help_text='Statut Yousign : pending, ongoing, done, rejected, expired, canceled')
 
     class Meta:
         verbose_name = 'Signification'

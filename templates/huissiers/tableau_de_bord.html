@@ -124,18 +124,18 @@
               <td><span class="badge badge-{{ sig.statut }}">{{ sig.get_statut_display }}</span></td>
               <td class="td-actions">
                 {% if sig.statut != 'en_attente' %}
-                <a href="{% url 'significations:telecharger_acte' sig.uuid %}" class="btn btn-xs btn-outline spinner-link" data-loading="Téléchargement…" title="Télécharger l'acte">📄 Acte</a>
+                <a href="{% url 'significations:telecharger_acte' sig.uuid %}" target="_blank" rel="noopener" class="btn btn-xs btn-outline spinner-link" data-loading="Téléchargement…" title="Télécharger l'acte">📄 Acte</a>
                 {% endif %}
                 {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
                   {% if sig.certificat %}
-                  <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}" class="btn btn-xs btn-blue spinner-link" data-loading="Téléchargement…" title="Certificat de signification">✓ Certificat</a>
+                  <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}" target="_blank" rel="noopener" class="btn btn-xs btn-blue spinner-link" data-loading="Téléchargement…" title="Certificat de signification">✓ Certificat</a>
                   {% endif %}
                 {% endif %}
                 {% if sig.statut == 'repondu' %}
-                <a href="{% url 'significations:voir_reponse' sig.uuid %}" class="btn btn-xs btn-green spinner-link" title="Voir la réponse">↩ Réponse</a>
+                <a href="{% url 'significations:voir_reponse' sig.uuid %}" target="_blank" rel="noopener" class="btn btn-xs btn-green spinner-link" title="Voir la réponse">↩ Réponse</a>
                 {% endif %}
                 {% if sig.statut == 'non_delivree' or sig.statut == 'relance_2' %}
-                <a href="{% url 'significations:telecharger_constat' sig.uuid %}" class="btn btn-xs btn-warning spinner-link" data-loading="Téléchargement…" title="Constat de non-délivrance">⚠ Constat</a>
+                <a href="{% url 'significations:telecharger_constat' sig.uuid %}" target="_blank" rel="noopener" class="btn btn-xs btn-warning spinner-link" data-loading="Téléchargement…" title="Constat de non-délivrance">⚠ Constat</a>
                 {% endif %}
               </td>
             </tr>

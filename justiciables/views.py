@@ -39,6 +39,7 @@ def tableau_de_bord(request):
 @login_required
 @justiciable_required
 def liste_significations(request):
+    from django.core.paginator import Paginator
     profil = request.user.profil_justiciable
     statut = request.GET.get('statut', 'en_attente')
     periode = request.GET.get('periode', '')
@@ -46,14 +47,32 @@ def liste_significations(request):
     if statut and statut != 'toutes':
         qs = qs.filter(statut=statut)
     if periode:
-        from datetime import timedelta
-        today = timezone.now()
-        if periode == 'mois':
-            qs = qs.filter(date_envoi__gte=today - timedelta(days=30))
-        elif periode == '3mois':
-            qs = qs.filter(date_envoi__gte=today - timedelta(days=90))
+        from datetime import timedelta, date
+        today = timezone.now().date()
+        if periode == 'semaine':
+            from datetime import timedelta
+            qs = qs.filter(date_envoi__date__gte=today - timedelta(days=today.weekday()))
+        elif periode == 'mois':
+            qs = qs.filter(date_envoi__year=today.year, date_envoi__month=today.month)
+        elif periode == 'mois_dernier':
+            if today.month == 1:
+                qs = qs.filter(date_envoi__year=today.year - 1, date_envoi__month=12)
+            else:
+                qs = qs.filter(date_envoi__year=today.year, date_envoi__month=today.month - 1)
+        elif periode == 'trimestre':
+            qs = qs.filter(date_envoi__date__gte=today - timedelta(days=90))
+        elif periode == 'annee':
+            qs = qs.filter(date_envoi__year=today.year)
+        elif periode == 'annee_derniere':
+            qs = qs.filter(date_envoi__year=today.year - 1)
+    paginator = Paginator(qs.order_by('-date_envoi'), 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    params = request.GET.copy()
+    params.pop('page', None)
     return render(request, 'justiciables/liste_significations.html', {
-        'significations': qs.order_by('-date_envoi'),
+        'significations': page_obj,
+        'page_obj': page_obj,
+        'params_str': params.urlencode(),
         'statut_filtre': statut, 'periode': periode,
     })
 

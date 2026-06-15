@@ -39,6 +39,9 @@ django-extensions==4.1
 # PRODUCTION uniquement (décommenter pour le déploiement)
 # ============================================================
 
+# Fichiers statiques en production (remplace Nginx pour les assets)
+whitenoise==6.9.0
+
 # Serveur WSGI production
 # gunicorn==23.0.0
 

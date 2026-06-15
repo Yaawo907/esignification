@@ -13,34 +13,83 @@
 
   <!-- Aperçu si déjà enregistré -->
   {% if b64_actuel %}
-  <div style="margin-bottom:14px; padding:12px; background:#f8fafb; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; gap:16px;">
+  <div id="apercu-actuel-{{ slug }}" style="margin-bottom:14px; padding:12px; background:#f8fafb; border:1px solid var(--border); border-radius:8px; display:flex; align-items:center; gap:16px;">
     <img src="{{ b64_actuel }}" alt="Aperçu {{ titre }}"
-         style="max-height:60px; max-width:200px; object-fit:contain; border:1px solid #e2e8f0; border-radius:4px; background:#fff; padding:4px;">
+         style="max-height:64px; max-width:200px; object-fit:contain; border:1px solid #e2e8f0; border-radius:4px; background:#fff; padding:4px;">
     <div>
       <div style="font-size:12px; font-weight:600; color:var(--text-primary);">{{ label_actuel }}</div>
-      <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">Enregistré — cliquez "Redessiner" pour remplacer</div>
+      <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">Cliquez « Modifier » pour remplacer</div>
     </div>
   </div>
   {% endif %}
 
-  <!-- Pad de dessin (masqué si déjà enregistré) -->
+  <!-- Zone dessin/import (masquée si déjà enregistré) -->
   <div id="zone-pad-{{ slug }}" style="{% if b64_actuel %}display:none;{% endif %}">
-    <div style="position:relative; border:2px solid var(--border); border-radius:8px; background:#fafafa; overflow:hidden; margin-bottom:10px;">
-      <canvas id="canvas-{{ slug }}" width="680" height="150"
-              style="display:block; width:100%; touch-action:none; cursor:crosshair;"></canvas>
-      <div id="ph-{{ slug }}" style="position:absolute; inset:0; display:flex; align-items:center;
-           justify-content:center; pointer-events:none; font-size:13px; color:#ccc; letter-spacing:.04em;">
-        ✍&nbsp; Dessinez {{ titre|lower }} ici
+
+    <!-- Onglets : Dessiner / Importer -->
+    <div style="display:flex; gap:0; margin-bottom:12px; border:1px solid var(--border); border-radius:8px; overflow:hidden; width:fit-content;">
+      <button type="button" id="tab-dessin-{{ slug }}"
+              onclick="switchTab('{{ slug }}','dessin')"
+              style="padding:7px 18px; font-size:12px; font-weight:600; border:none; cursor:pointer;
+                     background:var(--primary); color:#fff;">
+        ✍ Dessiner
+      </button>
+      <button type="button" id="tab-import-{{ slug }}"
+              onclick="switchTab('{{ slug }}','import')"
+              style="padding:7px 18px; font-size:12px; font-weight:600; border:none; cursor:pointer;
+                     background:#fff; color:var(--text-secondary);">
+        ⬆ Importer une image
+      </button>
+    </div>
+
+    <!-- Panneau dessin -->
+    <div id="panel-dessin-{{ slug }}">
+      <div style="position:relative; border:2px solid var(--border); border-radius:8px; background:#fafafa; overflow:hidden; margin-bottom:10px;">
+        <canvas id="canvas-{{ slug }}" width="680" height="150"
+                style="display:block; width:100%; touch-action:none; cursor:crosshair;"></canvas>
+        <div id="ph-{{ slug }}" style="position:absolute; inset:0; display:flex; align-items:center;
+             justify-content:center; pointer-events:none; font-size:13px; color:#ccc; letter-spacing:.04em;">
+          ✍&nbsp; Dessinez {{ titre|lower }} ici
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="effacerPad('{{ slug }}')">✕ Effacer le pad</button>
+        <span id="status-{{ slug }}" style="font-size:12px; color:var(--text-secondary);">Pad vide</span>
       </div>
     </div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <button type="button" class="btn btn-ghost btn-sm" onclick="effacerPad('{{ slug }}')">✕ Effacer</button>
-      <span id="status-{{ slug }}" style="font-size:12px; color:var(--text-secondary);">Pad vide</span>
+
+    <!-- Panneau import -->
+    <div id="panel-import-{{ slug }}" style="display:none;">
+      <label id="upload-zone-{{ slug }}"
+             style="display:flex; flex-direction:column; align-items:center; justify-content:center;
+                    border:2px dashed var(--border); border-radius:8px; background:#fafafa;
+                    padding:28px 20px; cursor:pointer; transition:border-color .2s;"
+             onmouseover="this.style.borderColor='var(--primary)'"
+             onmouseout="this.style.borderColor='var(--border)'">
+        <input type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+               style="display:none;" onchange="importerImage(this, '{{ slug }}')">
+        <div style="font-size:28px; margin-bottom:8px; opacity:.4;">🖼</div>
+        <div style="font-size:13px; font-weight:600; color:var(--text-secondary);">Cliquez pour choisir un fichier</div>
+        <div style="font-size:11px; color:var(--text-light); margin-top:4px;">PNG, JPG ou SVG — fond transparent recommandé — max 2 Mo</div>
+      </label>
+      <!-- Aperçu de l'image importée -->
+      <div id="import-preview-{{ slug }}" style="display:none; margin-top:12px; padding:12px; background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; display:none; align-items:center; gap:12px;">
+        <img id="import-img-{{ slug }}" src="" alt="Aperçu"
+             style="max-height:64px; max-width:180px; object-fit:contain; background:#fff; border:1px solid #e2e8f0; border-radius:4px; padding:4px;">
+        <div>
+          <div style="font-size:12px; font-weight:600; color:#134e3a;" id="import-nom-{{ slug }}"></div>
+          <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">Prêt à enregistrer</div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" style="margin-left:auto;"
+                onclick="reinitImport('{{ slug }}')">✕ Changer</button>
+      </div>
+      <span id="status-{{ slug }}" style="font-size:12px; color:var(--text-secondary); display:block; margin-top:8px;"></span>
     </div>
-  </div>
+
+  </div><!-- /zone-pad -->
 
   <!-- Formulaire POST -->
-  <form method="post" style="margin-top:14px;" id="form-{{ slug }}">
+  <form method="post" style="margin-top:16px;" id="form-{{ slug }}">
     {% csrf_token %}
     <input type="hidden" name="action" value="{{ action }}">
     <input type="hidden" name="{{ champ_b64 }}" id="b64-{{ slug }}">
@@ -48,14 +97,13 @@
       <div class="form-group" style="flex:1; min-width:180px; margin-bottom:0;">
         <label class="form-label" style="font-size:11px;">Libellé affiché lors du choix</label>
         <input type="text" name="{{ champ_label }}" class="form-input"
-               value="{{ label_actuel }}" maxlength="80"
-               style="font-size:13px; padding:7px 12px;">
+               value="{{ label_actuel }}" maxlength="80" style="font-size:13px; padding:7px 12px;">
       </div>
       <div style="display:flex; gap:8px;">
         {% if b64_actuel %}
         <button type="button" class="btn btn-ghost btn-sm"
-                onclick="document.getElementById('zone-pad-{{ slug }}').style.display='block'; this.style.display='none';">
-          ✏ Redessiner
+                onclick="afficherZonePad('{{ slug }}')">
+          ✏ Modifier
         </button>
         {% endif %}
         <button type="submit" class="btn btn-primary btn-sm" id="btn-save-{{ slug }}"
@@ -66,7 +114,7 @@
     </div>
   </form>
 
-  <!-- Effacer -->
+  <!-- Supprimer -->
   {% if b64_actuel %}
   <form method="post" style="margin-top:8px; text-align:right;">
     {% csrf_token %}

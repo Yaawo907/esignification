@@ -10,4 +10,5 @@ urlpatterns = [
     path('<uuid:uuid>/reponse/telecharger/', views.telecharger_reponse, name='telecharger_reponse'),
     path('<uuid:uuid>/traditionnel/', views.basculer_traditionnel, name='basculer_traditionnel'),
     path('<uuid:uuid>/constat/', views.telecharger_constat, name='telecharger_constat'),
+    path('webhook/yousign/', views.webhook_yousign, name='webhook_yousign'),
 ]

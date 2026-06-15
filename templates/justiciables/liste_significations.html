@@ -39,7 +39,7 @@
       <div>
         <h1 class="topbar-title">Mes significations reçues</h1>
         <div class="topbar-sub">
-          {{ significations|length }} acte{% if significations|length != 1 %}s{% endif %}
+          {{ page_obj.paginator.count }} acte{% if page_obj.paginator.count != 1 %}s{% endif %}
           {% if statut_filtre and statut_filtre != 'toutes' %}· filtre actif{% endif %}
         </div>
       </div>
@@ -48,17 +48,15 @@
     <div class="content-area">
 
       <!-- Alerte : actes en attente -->
-      {% with pending=significations|length %}
-      {% if statut_filtre == 'en_attente' and pending > 0 %}
+      {% if statut_filtre == 'en_attente' and page_obj.paginator.count > 0 %}
       <div class="alert-banner" style="background:#fffbea; border-color:#d97706; color:#854f0b; margin-bottom:16px;">
         <span>⚠</span>
         <span>
-          <strong>{{ pending }} acte{% if pending != 1 %}s{% endif %} nécessite{% if pending == 1 %}nt{% endif %} votre attention.</strong>
+          <strong>{{ page_obj.paginator.count }} acte{% if page_obj.paginator.count != 1 %}s{% endif %} nécessite{% if page_obj.paginator.count == 1 %}nt{% endif %} votre attention.</strong>
           Acceptez ou refusez chaque signification depuis votre email ou depuis cette page.
         </span>
       </div>
       {% endif %}
-      {% endwith %}
 
       <!-- ── Filtres ── -->
       <div class="card" style="margin-bottom:16px;">
@@ -94,10 +92,14 @@
             <!-- Filtre période -->
             <input type="hidden" name="statut" value="{{ statut_filtre }}">
             <select name="periode" onchange="document.getElementById('form-filtres').submit()"
-              class="form-input" style="width:auto; padding:6px 10px; font-size:12px;">
-              <option value="" {% if not periode %}selected{% endif %}>Toute la période</option>
-              <option value="mois" {% if periode == 'mois' %}selected{% endif %}>Ce mois</option>
-              <option value="3mois" {% if periode == '3mois' %}selected{% endif %}>3 derniers mois</option>
+              class="form-input" style="width:180px; padding:6px 10px; font-size:12px;">
+              <option value=""               {% if not periode %}selected{% endif %}>Toute la période</option>
+              <option value="semaine"        {% if periode == 'semaine' %}selected{% endif %}>Cette semaine</option>
+              <option value="mois"           {% if periode == 'mois' %}selected{% endif %}>Ce mois</option>
+              <option value="mois_dernier"   {% if periode == 'mois_dernier' %}selected{% endif %}>Le mois dernier</option>
+              <option value="trimestre"      {% if periode == 'trimestre' %}selected{% endif %}>Dernier trimestre</option>
+              <option value="annee"          {% if periode == 'annee' %}selected{% endif %}>Année en cours</option>
+              <option value="annee_derniere" {% if periode == 'annee_derniere' %}selected{% endif %}>Année dernière</option>
             </select>
 
           </form>
@@ -268,6 +270,8 @@
         <div id="no-search-sig" style="display:none; text-align:center; padding:28px; color:var(--text-light); font-size:13px;">
           Aucune signification ne correspond à cette recherche.
         </div>
+
+        {% include 'base/_pagination.html' %}
 
       </div><!-- /card -->
 

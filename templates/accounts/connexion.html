@@ -48,3 +48,20 @@
   </div>
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+(function () {
+  var params = new URLSearchParams(window.location.search);
+  var email = params.get('email');
+  if (!email) return;
+  var field = document.getElementById('{{ form.email.id_for_label }}');
+  if (field && !field.value) {
+    field.value = email;
+    var mdp = document.getElementById('{{ form.mot_de_passe.id_for_label }}');
+    if (mdp) mdp.focus();
+  }
+})();
+</script>
+{% endblock %}

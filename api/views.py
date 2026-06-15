@@ -81,3 +81,63 @@ def tester_certigna_ajax(request):
         return Response({'success': True, 'message': 'Service Certigna joignable.'})
     except Exception as e:
         return Response({'success': False, 'message': f'Erreur de connexion : {str(e)}'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def tester_yousign_ajax(request):
+    """
+    Teste la connexion Yousign.
+    Accepte la clé API et le mode depuis le corps JSON (test avant sauvegarde),
+    ou depuis la base si aucune clé n'est fournie dans la requête.
+    """
+    if request.user.role != User.ADMIN:
+        return Response({'error': 'Non autorisé'}, status=403)
+
+    import json as _json
+    import urllib.request as _req
+    import urllib.error as _uerr
+    from administration.models import ConfigurationPlateforme
+    from securite.chiffrement import dechiffrer_texte
+
+    # Lire la clé depuis le body JSON (envoyée par le bouton Tester avant sauvegarde)
+    api_key = ''
+    mode = 'sandbox'
+    try:
+        body = _json.loads(request.body or '{}')
+        api_key = body.get('api_key', '').strip()
+        mode = body.get('mode', 'sandbox')
+    except Exception:
+        pass
+
+    # Fallback : lire depuis la base si rien dans le body
+    if not api_key:
+        config = ConfigurationPlateforme.get()
+        if not config.yousign_api_key_chiffre:
+            return Response({'success': False,
+                             'message': 'Aucune cle API. Saisissez-la puis cliquez Tester.'})
+        try:
+            api_key = dechiffrer_texte(config.yousign_api_key_chiffre)
+            mode = config.yousign_mode
+        except Exception:
+            return Response({'success': False, 'message': 'Erreur dechiffrement cle en base.'})
+
+    base = ('https://api-sandbox.yousign.app/v3' if mode == 'sandbox'
+            else 'https://api.yousign.app/v3')
+    url = base + '/signature_requests?items_per_page=1'
+    try:
+        r = _req.Request(url, headers={
+            'Authorization': 'Bearer ' + api_key,
+            'Accept': 'application/json',
+        })
+        with _req.urlopen(r, timeout=10) as resp:
+            resp.read()
+        return Response({'success': True, 'message': 'Connexion Yousign OK — mode ' + mode + '.'})
+    except _uerr.HTTPError as e:
+        if e.code == 401:
+            return Response({'success': False, 'message': 'Cle API invalide (401 Unauthorized).'})
+        if e.code == 403:
+            return Response({'success': False, 'message': 'Acces refuse (403). Verifiez les permissions.'})
+        return Response({'success': False, 'message': 'Erreur HTTP ' + str(e.code) + '.'})
+    except Exception as e:
+        return Response({'success': False, 'message': 'Erreur reseau : ' + str(e)})

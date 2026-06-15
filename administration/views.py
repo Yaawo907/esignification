@@ -184,6 +184,20 @@ def configuration(request):
             config.save()
             journaliser(request.user, 'configuration_certigna_modifiee', request=request)
             messages.success(request, "Configuration Certigna enregistrée.")
+        elif action == 'yousign':
+            config.yousign_active = request.POST.get('yousign_active') == 'on'
+            config.yousign_mode = request.POST.get('yousign_mode', 'sandbox')
+            api_key = request.POST.get('yousign_api_key', '').strip()
+            if api_key:
+                from securite.chiffrement import chiffrer_texte
+                config.yousign_api_key_chiffre = chiffrer_texte(api_key)
+            webhook_secret = request.POST.get('yousign_webhook_secret', '').strip()
+            if webhook_secret:
+                from securite.chiffrement import chiffrer_texte
+                config.yousign_webhook_secret_chiffre = chiffrer_texte(webhook_secret)
+            config.save()
+            journaliser(request.user, 'configuration_yousign_modifiee', request=request)
+            messages.success(request, "Configuration Yousign enregistrée.")
         elif action == 'logos':
             import imghdr
             for champ, nom in [('logo_pays', 'logo_pays'), ('logo_chambre', 'logo_chambre')]:
@@ -243,3 +257,56 @@ def gerer_textes_legaux(request):
 def audit(request):
     qs = PisteAudit.objects.order_by('-date')[:500]
     return render(request, 'administration/audit.html', {'activites': qs})
+
+
+@login_required
+@admin_required
+@require_http_methods(["POST"])
+def tester_yousign(request):
+    """Teste la connexion Yousign — lit la cle depuis le body JSON."""
+    import json as _json
+    import urllib.request as _req
+    import urllib.error as _uerr
+    from django.http import JsonResponse
+
+    api_key = ''
+    mode = 'sandbox'
+    try:
+        body = _json.loads(request.body or '{}')
+        api_key = body.get('api_key', '').strip()
+        mode = body.get('mode', 'sandbox')
+    except Exception:
+        pass
+
+    if not api_key:
+        config = ConfigurationPlateforme.get()
+        if not config.yousign_api_key_chiffre:
+            return JsonResponse({'success': False,
+                                 'message': 'Aucune cle API. Saisissez-la puis cliquez Tester.'})
+        try:
+            from securite.chiffrement import dechiffrer_texte
+            api_key = dechiffrer_texte(config.yousign_api_key_chiffre)
+            mode = config.yousign_mode
+        except Exception:
+            return JsonResponse({'success': False, 'message': 'Erreur dechiffrement cle.'})
+
+    base = ('https://api-sandbox.yousign.app/v3' if mode == 'sandbox'
+            else 'https://api.yousign.app/v3')
+    url = base + '/signature_requests?items_per_page=1'
+    try:
+        r = _req.Request(url, headers={
+            'Authorization': 'Bearer ' + api_key,
+            'Accept': 'application/json',
+        })
+        with _req.urlopen(r, timeout=10) as resp:
+            resp.read()
+        return JsonResponse({'success': True,
+                             'message': 'Connexion Yousign OK — mode ' + mode + '.'})
+    except _uerr.HTTPError as e:
+        if e.code == 401:
+            return JsonResponse({'success': False, 'message': 'Cle API invalide (401).'})
+        if e.code == 403:
+            return JsonResponse({'success': False, 'message': 'Acces refuse (403).'})
+        return JsonResponse({'success': False, 'message': 'Erreur HTTP ' + str(e.code) + '.'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': 'Erreur reseau : ' + str(e)})

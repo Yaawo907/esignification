@@ -165,12 +165,138 @@
         </div>
       </div>
 
+      <!-- ── Yousign — Signature électronique avancée ── -->
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="card-title">Signature électronique avancée — Yousign</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="badge {% if config.yousign_active %}badge-actif{% else %}badge-inactif{% endif %}" id="yousign-badge">
+              {% if config.yousign_active %}Activé{% else %}Désactivé{% endif %}
+            </span>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="yousign-toggle"
+                {% if config.yousign_active %}checked{% endif %}
+                onchange="toggleYousign(this)">
+              <span style="font-size:12px;color:var(--text-secondary);">Activer</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card-body" id="yousign-off" {% if config.yousign_active %}style="display:none;"{% endif %}>
+          <div class="info-box">
+            <p style="margin:0;font-size:13px;">
+              Yousign permet aux huissiers de signer les actes numériquement avec une
+              <strong>signature électronique avancée (AES)</strong> — valeur légale supérieure à
+              une signature manuscrite scannée.
+            </p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--text-secondary);">
+              Un seul token API pour toute la plateforme. Les huissiers n'ont pas besoin de compte Yousign.
+            </p>
+          </div>
+        </div>
+
+        <div class="card-body" id="yousign-on" {% if not config.yousign_active %}style="display:none;"{% endif %}>
+          <form method="post" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="action" value="yousign">
+            <input type="hidden" name="yousign_active" id="yousign_active_field"
+                   value="{% if config.yousign_active %}on{% endif %}">
+
+            <div class="info-box" style="margin-bottom:16px;background:#fef9ec;border-color:#e9c46a;">
+              ⚡ Token API unique géré par l'administrateur. Les huissiers reçoivent un lien de
+              signature par email (OTP) à chaque envoi d'acte.
+            </div>
+
+            <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div class="form-group">
+                <label class="form-label">Environnement</label>
+                <select name="yousign_mode" id="yousign_mode_select" class="form-input">
+                  <option value="sandbox" {% if config.yousign_mode == 'sandbox' %}selected{% endif %}>🔧 Sandbox (tests)</option>
+                  <option value="production" {% if config.yousign_mode == 'production' %}selected{% endif %}>🚀 Production</option>
+                </select>
+                <div class="form-hint">Utilisez Sandbox pour valider avant de passer en prod.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Clé API Yousign</label>
+                <input type="password" name="yousign_api_key" id="yousign_api_key_input" class="form-input"
+                       placeholder="{% if config.yousign_api_key_chiffre %}●●●●●●●● (configurée){% else %}Coller votre clé API ici{% endif %}"
+                       autocomplete="off">
+                <div class="form-hint">Espace Yousign → Paramètres → API. Laisser vide pour conserver.</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Secret webhook (X-Yousign-Signature-256)</label>
+              <input type="password" name="yousign_webhook_secret" class="form-input"
+                     placeholder="{% if config.yousign_webhook_secret_chiffre %}●●●●●●●● (configuré){% else %}Secret HMAC fourni par Yousign{% endif %}"
+                     autocomplete="off">
+              <div class="form-hint">
+                URL webhook à configurer dans Yousign :
+                <code>https://votre-domaine.com/significations/webhook/yousign/</code>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:14px;margin-top:16px;">
+              <button type="button" class="btn btn-ghost" id="btn-tester-yousign" onclick="testerYousign()">
+                🔍 Tester la connexion
+              </button>
+              <span id="yousign-test-result" style="font-size:13px;"></span>
+              <div style="flex:1;text-align:right;">
+                <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+                  <span class="btn-text">Enregistrer Yousign</span>
+                  <span class="btn-loader" style="display:none;"></span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
     </div><!-- end content-area -->
   </main>
 </div>
 {% endblock %}
 {% block extra_scripts %}
+<style>
+.form-hint { font-size:11px; color:var(--text-secondary); margin-top:4px; }
+</style>
 <script>
+const CSRF_TOKEN = '{{ csrf_token }}';
+function toggleYousign(cb) {
+  document.getElementById('yousign-off').style.display = cb.checked ? 'none' : '';
+  document.getElementById('yousign-on').style.display  = cb.checked ? '' : 'none';
+  document.getElementById('yousign_active_field').value = cb.checked ? 'on' : '';
+  document.getElementById('yousign-badge').textContent = cb.checked ? 'Activé' : 'Désactivé';
+  document.getElementById('yousign-badge').className = 'badge ' + (cb.checked ? 'badge-actif' : 'badge-inactif');
+}
+function testerYousign() {
+  const btn = document.getElementById('btn-tester-yousign');
+  const res = document.getElementById('yousign-test-result');
+  const keyInput = document.getElementById('yousign_api_key_input');
+  const modeSelect = document.getElementById('yousign_mode_select');
+  btn.disabled = true;
+  res.textContent = 'Test en cours…';
+  res.style.color = 'var(--text-secondary)';
+  // Envoyer la clé du formulaire pour tester sans sauvegarder
+  const body = {
+    api_key: keyInput ? keyInput.value.trim() : '',
+    mode: modeSelect ? modeSelect.value : 'sandbox',
+  };
+  fetch('/administration/yousign/tester/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': CSRF_TOKEN,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  }).then(r => r.json()).then(d => {
+    res.textContent = d.message || (d.success ? 'OK' : 'Échec');
+    res.style.color = d.success ? 'var(--green)' : 'var(--red)';
+  }).catch(() => {
+    res.textContent = 'Erreur réseau.';
+    res.style.color = 'var(--red)';
+  }).finally(() => { btn.disabled = false; });
+}
 function toggleCertigna(cb) {
   document.getElementById('certigna-off').style.display = cb.checked ? 'none' : '';
   document.getElementById('certigna-on').style.display = cb.checked ? '' : 'none';
@@ -183,14 +309,10 @@ function previewLogo(input, boxId) {
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   if (!['image/png', 'image/jpeg'].includes(file.type)) {
-    alert('Format non supporté. Utilisez PNG ou JPEG.');
-    input.value = '';
-    return;
+    alert('Format non supporté. Utilisez PNG ou JPEG.'); input.value = ''; return;
   }
   if (file.size > 2 * 1024 * 1024) {
-    alert('Le fichier dépasse 2 Mo.');
-    input.value = '';
-    return;
+    alert('Le fichier dépasse 2 Mo.'); input.value = ''; return;
   }
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -206,7 +328,7 @@ function testerCertigna() {
   res.style.color = 'var(--text-secondary)';
   fetch('/api/certigna/tester/', {
     method: 'POST',
-    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json'}
+    headers: {'X-CSRFToken': CSRF_TOKEN, 'Content-Type': 'application/json'}
   }).then(r => r.json()).then(d => {
     res.textContent = d.message;
     res.style.color = d.success ? 'var(--green)' : 'var(--red)';
@@ -214,13 +336,6 @@ function testerCertigna() {
     res.textContent = 'Erreur réseau.';
     res.style.color = 'var(--red)';
   }).finally(() => { btn.disabled = false; });
-}
-function getCookie(n) {
-  let v = null;
-  document.cookie.split(';').forEach(c => {
-    if (c.trim().startsWith(n + '=')) v = decodeURIComponent(c.trim().slice(n.length + 1));
-  });
-  return v;
 }
 </script>
 {% endblock %}

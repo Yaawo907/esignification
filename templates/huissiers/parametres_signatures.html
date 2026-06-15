@@ -132,7 +132,6 @@ function effacerPad(slug) {
   var canvas = document.getElementById('canvas-' + slug);
   if (!canvas) return;
   var ctx = canvas.getContext('2d');
-  var rect = canvas.getBoundingClientRect();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   var b64Input = document.getElementById('b64-' + slug);
   if (b64Input) b64Input.value = '';
@@ -142,6 +141,76 @@ function effacerPad(slug) {
   if (status) { status.textContent = 'Pad vide'; status.style.color = 'var(--text-secondary)'; }
   var btnSave = document.getElementById('btn-save-' + slug);
   if (btnSave) btnSave.disabled = true;
+}
+
+/* ── Onglets Dessiner / Importer ── */
+function switchTab(slug, tab) {
+  var dessin = document.getElementById('panel-dessin-' + slug);
+  var imp    = document.getElementById('panel-import-' + slug);
+  var tDessin = document.getElementById('tab-dessin-' + slug);
+  var tImport = document.getElementById('tab-import-' + slug);
+  var activeStyle = 'background:var(--primary);color:#fff;';
+  var inactiveStyle = 'background:#fff;color:var(--text-secondary);';
+  if (tab === 'dessin') {
+    if (dessin) dessin.style.display = 'block';
+    if (imp)    imp.style.display    = 'none';
+    if (tDessin) tDessin.setAttribute('style', tDessin.getAttribute('style').replace(/background:[^;]+;color:[^;]+;/, activeStyle));
+    if (tImport) tImport.setAttribute('style', tImport.getAttribute('style').replace(/background:[^;]+;color:[^;]+;/, inactiveStyle));
+  } else {
+    if (dessin) dessin.style.display = 'none';
+    if (imp)    imp.style.display    = 'block';
+    if (tDessin) tDessin.setAttribute('style', tDessin.getAttribute('style').replace(/background:[^;]+;color:[^;]+;/, inactiveStyle));
+    if (tImport) tImport.setAttribute('style', tImport.getAttribute('style').replace(/background:[^;]+;color:[^;]+;/, activeStyle));
+    // Vider le pad quand on bascule sur import
+    effacerPad(slug);
+  }
+}
+
+/* ── Import image → base64 ── */
+function importerImage(input, slug) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Fichier trop lourd (max 2 Mo).');
+    input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64 = e.target.result;
+    document.getElementById('b64-' + slug).value = b64;
+    // Aperçu
+    var preview = document.getElementById('import-preview-' + slug);
+    var img     = document.getElementById('import-img-' + slug);
+    var nom     = document.getElementById('import-nom-' + slug);
+    if (preview && img) { img.src = b64; preview.style.display = 'flex'; }
+    if (nom) nom.textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' Ko)';
+    var btnSave = document.getElementById('btn-save-' + slug);
+    if (btnSave) btnSave.disabled = false;
+    var status = document.getElementById('status-' + slug);
+    if (status) { status.textContent = '✓ Image chargée — prête à enregistrer'; status.style.color = 'var(--primary)'; }
+  };
+  reader.readAsDataURL(file);
+}
+
+function reinitImport(slug) {
+  document.getElementById('b64-' + slug).value = '';
+  var preview = document.getElementById('import-preview-' + slug);
+  if (preview) preview.style.display = 'none';
+  var btnSave = document.getElementById('btn-save-' + slug);
+  if (btnSave) btnSave.disabled = true;
+  var status = document.getElementById('status-' + slug);
+  if (status) { status.textContent = ''; }
+  // Réinitialiser l'input file
+  var zone = document.getElementById('upload-zone-' + slug);
+  if (zone) { var fi = zone.querySelector('input[type=file]'); if (fi) fi.value = ''; }
+}
+
+function afficherZonePad(slug) {
+  var apercu = document.getElementById('apercu-actuel-' + slug);
+  if (apercu) apercu.style.display = 'none';
+  var zone = document.getElementById('zone-pad-' + slug);
+  if (zone) zone.style.display = 'block';
 }
 
 /* Init tous les pads au chargement */

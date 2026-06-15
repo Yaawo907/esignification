@@ -10,4 +10,5 @@ urlpatterns = [
     path('configuration/', views.configuration, name='configuration'),
     path('textes-legaux/', views.gerer_textes_legaux, name='textes_legaux'),
     path('audit/', views.audit, name='audit'),
+    path('yousign/tester/', views.tester_yousign, name='tester_yousign'),
 ]
