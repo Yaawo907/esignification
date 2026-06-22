@@ -56,6 +56,16 @@ def mfa_verification(request):
     if not user_id:
         return redirect('accounts:connexion')
     user = get_object_or_404(User, pk=user_id)
+    # Bypass MFA pour les superusers
+    if user.is_superuser or not user.mfa_active:
+        user.is_active = True
+        user.derniere_connexion = timezone.now()
+        user.save(update_fields=['derniere_connexion', 'is_active'])
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        del request.session['pre_auth_user_id']
+        journaliser(user, 'connexion_reussie', request=request)
+        next_url = request.session.pop('pre_auth_next', '')
+        return redirect(next_url or redirect_apres_connexion(user))
     form = MFACodeForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         code = form.cleaned_data['code']
