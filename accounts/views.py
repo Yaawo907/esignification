@@ -28,7 +28,7 @@ def connexion(request):
         request.session['pre_auth_next'] = request.GET.get('next', '')
         # Envoyer code MFA si méthode email ou OTP
         if user.mfa_active and not user.is_superuser and user.mfa_methode in [User.MFA_EMAIL, User.MFA_OTP]:
-    	_envoyer_code_mfa(user)
+            _envoyer_code_mfa(user)
         journaliser(user, 'connexion_tentative', request=request)
         return redirect('accounts:mfa_verification')
     return render(request, 'accounts/connexion.html', {'form': form})
