@@ -113,6 +113,69 @@ document.addEventListener('DOMContentLoaded', function() {
     trapFocus(modal);
   });
 
+  /* ── Sidebar mobile : hamburger ── */
+  (function () {
+    var sidebar = document.querySelector('.sidebar');
+    var topbar  = document.querySelector('.topbar');
+    if (!sidebar || !topbar) return;
+
+    /* Overlay */
+    var overlay = document.createElement('div');
+    overlay.className = 'sidebar-overlay';
+    document.body.appendChild(overlay);
+
+    /* Bouton hamburger (construction DOM sécurisée, sans innerHTML) */
+    var btn = document.createElement('button');
+    btn.className = 'btn-hamburger';
+    btn.setAttribute('aria-label', 'Ouvrir le menu');
+    btn.setAttribute('type', 'button');
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', '18');
+    svg.setAttribute('height', '18');
+    svg.setAttribute('viewBox', '0 0 18 18');
+    svg.setAttribute('fill', 'currentColor');
+    ['2', '8', '14'].forEach(function (y) {
+      var rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', '18');
+      rect.setAttribute('height', '2');
+      rect.setAttribute('rx', '1');
+      svg.appendChild(rect);
+    });
+    btn.appendChild(svg);
+    topbar.insertBefore(btn, topbar.firstElementChild);
+
+    function openMenu() {
+      sidebar.classList.add('open');
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      btn.setAttribute('aria-label', 'Fermer le menu');
+    }
+    function closeMenu() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('open');
+      document.body.style.overflow = '';
+      btn.setAttribute('aria-label', 'Ouvrir le menu');
+    }
+
+    btn.addEventListener('click', function () {
+      sidebar.classList.contains('open') ? closeMenu() : openMenu();
+    });
+    overlay.addEventListener('click', closeMenu);
+
+    /* Fermer quand un lien de nav est cliqué */
+    sidebar.querySelectorAll('.nav-item').forEach(function (item) {
+      item.addEventListener('click', closeMenu);
+    });
+
+    /* Fermer si retour en mode desktop */
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 768) closeMenu();
+    });
+  })();
+
 });
 
 /* ── Requête AJAX sécurisée (avec CSRF) ── */

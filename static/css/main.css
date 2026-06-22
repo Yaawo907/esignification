@@ -304,3 +304,94 @@ tr:hover td { background: #fafbfd; }
   margin: 0 auto 14px; display: block;
   border-radius: 0;
 }
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE MOBILE
+   ═══════════════════════════════════════════════════ */
+
+/* Bouton hamburger — injecté par JS, masqué par défaut sur desktop */
+.btn-hamburger {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 38px; height: 38px; flex-shrink: 0;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  color: var(--text-primary); margin-right: 8px;
+}
+
+/* Overlay sombre derrière la sidebar ouverte */
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 999;
+  backdrop-filter: blur(1px);
+}
+.sidebar-overlay.open { display: block; }
+
+@media (max-width: 768px) {
+
+  /* ── Layout ── */
+  .dashboard-layout { flex-direction: column; }
+
+  /* ── Sidebar : tiroir coulissant ── */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    height: 100vh; min-height: 100vh; width: 260px !important;
+    z-index: 1000; overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+  }
+  .sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,.25); }
+
+  /* ── Hamburger visible ── */
+  .btn-hamburger { display: flex; }
+
+  /* ── Topbar ── */
+  .topbar { padding: 0 12px; height: 56px; }
+  .topbar-title { font-size: 14px; }
+  .topbar-sub { display: none; }
+  .topbar-actions { gap: 6px; }
+  .topbar-actions .btn-primary { font-size: 12px; padding: 7px 10px; }
+
+  /* ── Contenu ── */
+  .content-area { padding: 12px; }
+
+  /* ── Stats ── */
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stats-grid-5 { grid-template-columns: repeat(2, 1fr); }
+  .stat-card { padding: 12px; }
+  .stat-val { font-size: 20px; }
+  .stat-label { font-size: 11px; }
+
+  /* ── Cards ── */
+  .card-header { padding: 10px 14px; }
+  .card-body { padding: 12px 14px; }
+  .two-col-grid { grid-template-columns: 1fr; }
+
+  /* ── Formulaires ── */
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+  .auth-card { padding: 24px 18px; }
+
+  /* ── Tables ── */
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+  th { font-size: 10px; padding: 8px 10px; }
+  td { font-size: 12px; padding: 10px; }
+  .btn-xs { padding: 4px 8px; font-size: 10px; }
+  .td-actions { gap: 3px; }
+
+  /* ── Alertes / toasts ── */
+  #messages-container { left: 10px; right: 10px; max-width: none; top: 10px; }
+  .alert-banner { flex-wrap: wrap; gap: 8px; }
+  .alert-banner .btn { margin-left: 0; }
+
+  /* ── Flow steps ── */
+  .flow-steps { flex-direction: column; gap: 10px; padding: 12px; }
+  .flow-steps::before { display: none; }
+
+  /* ── Messagerie ── */
+  .msg-bubble-wrap { max-width: 88%; }
+  .msg-zone { padding: 12px; }
+  .msg-conv-item { padding: 12px 14px; }
+
+  /* ── Pagination ── */
+  .pagination { flex-wrap: wrap; gap: 4px; }
+}

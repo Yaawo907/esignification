@@ -117,13 +117,21 @@
 
 @media (max-width: 640px) {
   .landing-nav { padding: 0 16px; }
-  .hero { padding: 100px 16px 56px; }
+  /* Masquer les liens de navigation secondaires, garder uniquement "Se connecter" */
+  .landing-nav-links a.btn-ghost { display: none; }
+  .hero { padding: 90px 16px 48px; }
+  /* Cacher le mockup complexe sur mobile (purement décoratif) */
+  .hero-mockup { display: none; }
   .stats-band { padding: 24px 16px; }
   .stat-item { padding: 10px 20px; border-right: none; border-bottom: 1px solid rgba(255,255,255,.15); }
   .stat-item:last-child { border-bottom: none; }
-  .section { padding: 48px 16px; }
+  .section { padding: 40px 16px; }
   .security-grid { grid-template-columns: 1fr; }
-  .justiciable-band { padding: 40px 16px; }
+  /* Steps : empiler verticalement */
+  .steps-grid { grid-template-columns: 1fr; }
+  .step { border-right: none; border-bottom: 1px solid #e2e8f0; padding: 20px 16px; }
+  .step:last-child { border-bottom: none; }
+  .justiciable-band { padding: 36px 16px; }
   .landing-footer { padding: 24px 16px; }
 }
 </style>
