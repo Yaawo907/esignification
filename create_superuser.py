@@ -8,15 +8,14 @@ django.setup()
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-username = 'admin'
 email = 'yawo907@gmail.com'
 password = '12345678@'
 
 user, created = User.objects.get_or_create(
-    username=username,
+    email=email,  # Utilisez 'email' au lieu de 'username'
     defaults={
-        'email': email,
         'is_active': True,
+        'is_staff': True,
         'is_superuser': True
     }
 )
@@ -24,7 +23,11 @@ user, created = User.objects.get_or_create(
 if created:
     user.set_password(password)
     user.is_superuser = True
+    user.is_staff = True
     user.save()
-    print(f'✅ Superuser "{username}" créé avec succès !')
+    print(f'✅ Superuser avec email "{email}" créé avec succès !')
 else:
-    print(f'ℹ️ Le superuser "{username}" existe déjà.')
+    print(f'ℹ️ Le superuser avec email "{email}" existe déjà.')
+    # Optionnel : mettre à jour le mot de passe
+    user.set_password(password)
+    user.save()
