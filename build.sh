@@ -13,12 +13,12 @@ python manage.py migrate
 
 # 4. (Optionnel) Créer le superutilisateur initial si aucun n'existe
 # Décommente les lignes ci-dessous et adapte les valeurs
-# python manage.py shell -c "
-# from django.contrib.auth import get_user_model
-# User = get_user_model()
-# if not User.objects.filter(is_superuser=True).exists():
-#     u = User.objects.create_superuser('admin', 'admin@exemple.com', 'MotDePasse123!')
-#     u.is_active = True
-#     u.save()
-#     print('Superuser créé')
-# "
+ python manage.py shell -c "
+ from django.contrib.auth import get_user_model
+ User = get_user_model()
+ if not User.objects.filter(is_superuser=True).exists():
+     u = User.objects.create_superuser('admin', 'yawo907@gmail.com', '12345678@')
+     u.is_active = True
+     u.save()
+     print('Superuser créé')
+ 
