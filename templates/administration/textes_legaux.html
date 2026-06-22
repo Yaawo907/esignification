@@ -72,7 +72,7 @@
           <form method="post" novalidate>
             {% csrf_token %}
             <input type="hidden" name="uuid" value="{{ texte.uuid }}">
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px;">
+            <div class="grid-3" style="gap:14px; margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label">Type</label>
                 <select name="type_texte" class="form-input">
@@ -131,7 +131,7 @@
           </div>
           <form method="post" novalidate>
             {% csrf_token %}
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px;">
+            <div class="grid-3" style="gap:14px; margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label">Type *</label>
                 <select name="type_texte" class="form-input">

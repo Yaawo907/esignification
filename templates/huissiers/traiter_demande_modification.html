@@ -39,7 +39,7 @@
     <div class="content-area">
       {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }}">{{ m }}</div>{% endfor %}{% endif %}
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+      <div class="grid-2" style="gap:20px;margin-bottom:20px;">
 
         <!-- Profil actuel -->
         <div class="card">
@@ -152,7 +152,7 @@
 
       <!-- Formulaire de décision (uniquement si en attente) -->
       {% if demande.statut == 'en_attente' %}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div class="grid-2" style="gap:16px;">
 
         <!-- Valider -->
         <div class="card" style="border-top:3px solid var(--green);">

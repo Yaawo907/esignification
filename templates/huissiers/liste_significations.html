@@ -55,12 +55,12 @@
       <div class="card" style="margin-bottom:16px;">
 
         <!-- Ligne 1 : Période + Recherche -->
-        <div style="padding:12px 18px; display:flex; gap:10px; align-items:center; border-bottom:1px solid var(--border);">
+        <div class="filtres-top" style="padding:12px 18px; display:flex; gap:10px; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap;">
           <span style="font-size:12px; color:var(--text-light); white-space:nowrap;">Période :</span>
-          <form method="get" id="form-periode" style="display:flex; align-items:center; gap:6px; flex:1;">
+          <form method="get" id="form-periode" style="display:flex; align-items:center; gap:6px; flex:1; min-width:140px;">
             <input type="hidden" name="statut" value="{{ statut_filtre }}">
             <select name="periode" onchange="document.getElementById('form-periode').submit()"
-              class="form-input" style="width:180px; padding:6px 10px; font-size:13px;">
+              class="form-input filtre-select" style="width:100%; max-width:180px; padding:6px 10px; font-size:13px;">
               <option value=""               {% if not periode %}selected{% endif %}>Toute la période</option>
               <option value="semaine"        {% if periode == 'semaine' %}selected{% endif %}>Cette semaine</option>
               <option value="mois"           {% if periode == 'mois' %}selected{% endif %}>Ce mois</option>
@@ -71,9 +71,9 @@
             </select>
           </form>
           <!-- Recherche client-side -->
-          <div style="position:relative;">
-            <input type="text" id="search-sig" class="form-input" placeholder="Rechercher…"
-              style="width:220px; padding-left:30px; font-size:13px;" autocomplete="off">
+          <div class="filtre-search-wrap" style="position:relative; flex:1; min-width:140px;">
+            <input type="text" id="search-sig" class="form-input filtre-search" placeholder="Rechercher…"
+              style="width:100%; max-width:220px; padding-left:30px; font-size:13px;" autocomplete="off">
             <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:13px; pointer-events:none;">⌕</span>
           </div>
         </div>
