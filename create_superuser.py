@@ -12,22 +12,26 @@ email = 'yawo907@gmail.com'
 password = '12345678@'
 
 user, created = User.objects.get_or_create(
-    email=email,  # Utilisez 'email' au lieu de 'username'
+    email=email,
     defaults={
         'is_active': True,
         'is_staff': True,
-        'is_superuser': True
+        'is_superuser': True,
+        'role': User.ADMIN,
+        'mfa_active': True,
     }
 )
 
 if created:
     user.set_password(password)
-    user.is_superuser = True
-    user.is_staff = True
     user.save()
-    print(f'✅ Superuser avec email "{email}" créé avec succès !')
+    print(f'Superuser avec email "{email}" créé avec succès !')
 else:
-    print(f'ℹ️ Le superuser avec email "{email}" existe déjà.')
-    # Optionnel : mettre à jour le mot de passe
+    print(f'Le superuser avec email "{email}" existe déjà. Mise à jour du rôle...')
     user.set_password(password)
+    user.is_active = True
+    user.is_staff = True
+    user.is_superuser = True
+    user.role = User.ADMIN
+    user.mfa_active = True
     user.save()
