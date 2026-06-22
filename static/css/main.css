@@ -309,124 +309,135 @@ tr:hover td { background: #fafbfd; }
    RESPONSIVE MOBILE
    ═══════════════════════════════════════════════════ */
 
-/* Bouton hamburger — injecté par JS, masqué par défaut sur desktop */
+/* Grille 2 colonnes responsive */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* Grille 3 colonnes responsive */
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+/* Bouton hamburger — masqué par défaut sur desktop */
 .btn-hamburger {
   display: none;
   align-items: center; justify-content: center;
-  width: 38px; height: 38px; flex-shrink: 0;
+  width: 40px; height: 40px; flex-shrink: 0;
   background: var(--bg-secondary); border: 1px solid var(--border);
   border-radius: var(--radius-sm); cursor: pointer;
-  color: var(--text-primary); margin-right: 8px;
+  color: var(--text-primary); margin-right: 10px;
 }
 
 /* Overlay sombre derrière la sidebar ouverte */
 .sidebar-overlay {
   display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.45); z-index: 999;
-  backdrop-filter: blur(1px);
+  background: rgba(0,0,0,.5); z-index: 999;
 }
 .sidebar-overlay.open { display: block; }
 
+/* ── MOBILE : max-width 768px ── */
 @media (max-width: 768px) {
 
-  /* ── Layout ── */
-  .dashboard-layout { flex-direction: column; }
+  /* Layout : empiler verticalement */
+  .dashboard-layout {
+    display: flex !important;
+    flex-direction: column !important;
+  }
 
-  /* ── Sidebar : tiroir coulissant ── */
+  /* Sidebar cachée par défaut — tiroir coulissant */
   .sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0;
-    height: 100vh; min-height: 100vh; width: 260px !important;
-    z-index: 1000; overflow-y: auto;
-    transform: translateX(-100%);
-    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    position: fixed !important;
+    top: 0 !important; left: 0 !important; bottom: 0 !important;
+    height: 100vh !important; width: 270px !important;
+    z-index: 1000 !important;
+    transform: translateX(-100%) !important;
+    transition: transform .28s cubic-bezier(.4,0,.2,1) !important;
+    overflow-y: auto !important;
+    flex-shrink: 0 !important;
   }
   .sidebar.open {
-    transform: translateX(0);
-    box-shadow: 4px 0 24px rgba(0,0,0,.25);
+    transform: translateX(0) !important;
+    box-shadow: 6px 0 28px rgba(0,0,0,.3) !important;
   }
 
-  /* ── Hamburger visible ── */
-  .btn-hamburger { display: flex; }
+  /* Contenu principal occupe toute la largeur */
+  .dashboard-main {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
 
-  /* ── Topbar ── */
-  .topbar { padding: 0 12px; height: 56px; }
-  .topbar-title { font-size: 14px; }
-  .topbar-sub { display: none; }
-  .topbar-actions { gap: 6px; }
-  .topbar-actions .btn-primary { font-size: 12px; padding: 7px 10px; }
+  /* Topbar */
+  .topbar {
+    height: 56px !important;
+    padding: 0 12px !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  .topbar-title { font-size: 14px !important; }
+  .topbar-sub { display: none !important; }
+  .topbar-actions { gap: 6px !important; }
+  .topbar-actions .btn-primary { font-size: 12px !important; padding: 7px 10px !important; }
 
-  /* ── Contenu ── */
-  .content-area { padding: 12px; }
+  /* Hamburger visible */
+  .btn-hamburger { display: flex !important; }
 
-  /* ── Stats ── */
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .stats-grid-5 { grid-template-columns: repeat(2, 1fr); }
-  .stat-card { padding: 12px; }
-  .stat-val { font-size: 20px; }
-  .stat-label { font-size: 11px; }
+  /* Contenu */
+  .content-area { padding: 12px !important; }
 
-  /* ── Cards ── */
-  .card-header { padding: 10px 14px; }
-  .card-body { padding: 12px 14px; }
-  .two-col-grid { grid-template-columns: 1fr; }
+  /* Stats : 2 colonnes */
+  .stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .stats-grid-5 { grid-template-columns: repeat(2, 1fr) !important; }
+  .stat-card { padding: 12px !important; }
+  .stat-val { font-size: 20px !important; }
+  .stat-label { font-size: 11px !important; }
 
-  /* ── Formulaires ── */
-  .form-row { grid-template-columns: 1fr; gap: 0; }
-  .auth-card { padding: 24px 18px; }
+  /* Grilles responsives */
+  .grid-2 { grid-template-columns: 1fr !important; gap: 12px !important; }
+  .grid-3 { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  .two-col-grid { grid-template-columns: 1fr !important; }
+  .form-row { grid-template-columns: 1fr !important; gap: 0 !important; }
 
-  /* ── Tables ── */
+  /* Cards */
+  .card-header { padding: 10px 14px !important; }
+  .card-body { padding: 12px 14px !important; }
+  .auth-card { padding: 24px 18px !important; }
+
+  /* Tables */
   .table-wrap { -webkit-overflow-scrolling: touch; }
-  th { font-size: 10px; padding: 8px 10px; }
-  td { font-size: 12px; padding: 10px; }
-  .btn-xs { padding: 4px 8px; font-size: 10px; }
-  .td-actions { gap: 3px; }
+  th { font-size: 10px !important; padding: 8px 10px !important; }
+  td { font-size: 12px !important; padding: 10px !important; }
+  .btn-xs { padding: 4px 8px !important; font-size: 10px !important; }
+  .td-actions { gap: 3px !important; }
 
-  /* ── Alertes / toasts ── */
-  #messages-container { left: 10px; right: 10px; max-width: none; top: 10px; }
-  .alert-banner { flex-wrap: wrap; gap: 8px; }
-  .alert-banner .btn { margin-left: 0; }
+  /* Alertes */
+  #messages-container { left: 10px !important; right: 10px !important; max-width: none !important; top: 10px !important; }
+  .alert-banner { flex-wrap: wrap !important; gap: 8px !important; }
+  .alert-banner .btn { margin-left: 0 !important; }
 
-  /* ── Flow steps ── */
-  .flow-steps { flex-direction: column; gap: 10px; padding: 12px; }
-  .flow-steps::before { display: none; }
-
-  /* ── Messagerie ── */
-  .msg-bubble-wrap { max-width: 88%; }
-  .msg-zone { padding: 12px; }
-  .msg-conv-item { padding: 12px 14px; }
-
-  /* ── Pagination ── */
-  .pagination { flex-wrap: wrap; gap: 4px; }
-}
-
-/* ── Grille 2 colonnes responsive ── */
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-@media (max-width: 768px) {
-  .grid-2 { grid-template-columns: 1fr; gap: 12px; }
-
-  /* Filtres liste significations */
+  /* Filtres significations */
   .filtres-top { flex-wrap: wrap !important; }
-  .filtre-select { width: 100% !important; }
-  .filtre-search { width: 100% !important; }
+  .filtre-select { width: 100% !important; max-width: 100% !important; }
+  .filtre-search { width: 100% !important; max-width: 100% !important; }
   .filtre-search-wrap { width: 100% !important; }
 
-  /* Panneau notifications : plein écran sur mobile */
-  #notif-panel { width: calc(100vw - 24px) !important; right: -8px !important; }
+  /* Panneau notifications */
+  #notif-panel { width: calc(100vw - 24px) !important; right: -4px !important; }
+
+  /* Flow steps */
+  .flow-steps { flex-direction: column !important; gap: 10px !important; padding: 12px !important; }
+  .flow-steps::before { display: none !important; }
+
+  /* Messagerie */
+  .msg-bubble-wrap { max-width: 90% !important; }
+  .msg-zone { padding: 12px !important; }
+  .msg-conv-item { padding: 12px 14px !important; }
+
+  /* Pagination */
+  .pagination { flex-wrap: wrap !important; gap: 4px !important; }
 }
 
-/* ── Grille 3 colonnes responsive ── */
-.grid-3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 14px;
-}
-@media (max-width: 768px) {
-  .grid-3 { grid-template-columns: 1fr; gap: 10px; }
-}
-@media (min-width: 480px) and (max-width: 768px) {
-  .grid-3 { grid-template-columns: 1fr 1fr; }
+/* ── TRÈS PETIT écran : < 480px ── */
+@media (max-width: 480px) {
+  .grid-3 { grid-template-columns: 1fr !important; }
 }
