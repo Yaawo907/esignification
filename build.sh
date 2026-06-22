@@ -14,12 +14,3 @@ python manage.py migrate
 # 4. (Optionnel) Créer le superutilisateur initial si aucun n'existe
 # Décommente les lignes ci-dessous et adapte les valeurs
 python create_superuser.py
-
-python -c "
-import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'esignification.settings')
-django.setup()
-from django.core.mail import send_mail
-send_mail('Test', 'Message test', 'noreply@esignification.bj', ['yawo907@gmail.com'])
-print('Email envoyé !')
-"
