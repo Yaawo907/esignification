@@ -21,4 +21,4 @@ python manage.py migrate
      u.is_active = True
      u.save()
      print('Superuser créé')
-" 
+"
