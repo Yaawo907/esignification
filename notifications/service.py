@@ -56,19 +56,53 @@ def envoyer_activation_huissier(email: str, token_brut: str, langue: str = 'fr')
     else:
         sujet = "Activez votre compte — e-Signification Bénin"
         corps = f"""
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-          <h2 style="color:#1a3c6e;">Bienvenue sur e-Signification Bénin</h2>
-          <p>Votre compte huissier a été créé par l'administrateur de la plateforme.</p>
-          <p>Veuillez cliquer sur le lien ci-dessous pour compléter votre inscription :</p>
-          <p style="margin:24px 0;">
-            <a href="{lien}" style="background:#1a3c6e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500;">
-              Activer mon compte
-            </a>
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:8px;">
+          <div style="background:#1a3c6e;padding:20px 24px;border-radius:6px 6px 0 0;margin:-24px -24px 24px -24px;">
+            <h1 style="color:#fff;margin:0;font-size:20px;font-weight:600;">e-Signification Bénin</h1>
+          </div>
+          <h2 style="color:#1a3c6e;font-size:18px;">Bienvenue sur la plateforme</h2>
+          <p style="color:#374151;">Votre compte huissier a été créé par l'administrateur de la plateforme.</p>
+          <p style="color:#374151;">Veuillez cliquer sur le bouton ci-dessous pour compléter votre inscription :</p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;">
+            <tr>
+              <td align="center">
+                <table cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background:#1a3c6e;border-radius:8px;padding:14px 32px;">
+                      <a href="{lien}" style="color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;display:inline-block;">
+                        ✉ Activer mon compte
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <p style="color:#6b7280;font-size:13px;">
+            Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :
           </p>
-          <p style="color:#888;font-size:13px;">Ce lien est valable {settings.ACTIVATION_TOKEN_EXPIRY_HOURS} heures.</p>
-          <p style="color:#888;font-size:12px;">Si vous n'attendiez pas cet email, ignorez-le.</p>
+          <p style="word-break:break-all;font-size:12px;">
+            <a href="{lien}" style="color:#1a3c6e;">{lien}</a>
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+          <p style="color:#9ca3af;font-size:12px;margin:0;">
+            Ce lien est valable {settings.ACTIVATION_TOKEN_EXPIRY_HOURS} heures.
+            Si vous n'attendiez pas cet email, ignorez-le.
+          </p>
         </div>"""
-    return envoyer_email(email, sujet, corps)
+    corps_texte = f"""Bienvenue sur e-Signification Bénin
+
+Votre compte huissier a été créé par l'administrateur.
+Cliquez sur le lien suivant pour activer votre compte :
+
+{lien}
+
+Ce lien est valable {settings.ACTIVATION_TOKEN_EXPIRY_HOURS} heures.
+"""
+    return envoyer_email(email, sujet, corps, corps_texte)
 
 
 def envoyer_invitation_justiciable(email_cible: str, huissier, token_brut: str, langue: str = 'fr'):
