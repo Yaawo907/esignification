@@ -120,6 +120,7 @@ EMAIL_USE_SSL = env.bool('EMAIL_USE_SSL', default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@esignification.bj')
+EMAIL_TIMEOUT = env.int('EMAIL_TIMEOUT', default=10)  # Timeout SMTP en secondes
 
 
 # Celery

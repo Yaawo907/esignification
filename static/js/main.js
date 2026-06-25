@@ -116,63 +116,112 @@ document.addEventListener('DOMContentLoaded', function() {
   /* ── Sidebar mobile : hamburger ── */
   (function () {
     var sidebar = document.querySelector('.sidebar');
-    var topbar  = document.querySelector('.topbar');
-    if (!sidebar || !topbar) return;
+    if (!sidebar) { window.toggleSidebar = function(){}; return; }
 
-    /* Overlay */
+    var BREAKPOINT = 768;
+    var isOpen = false;
+
+    /* ── Overlay ── */
     var overlay = document.createElement('div');
     overlay.className = 'sidebar-overlay';
     document.body.appendChild(overlay);
 
-    /* Bouton hamburger (construction DOM sécurisée, sans innerHTML) */
-    var btn = document.createElement('button');
-    btn.className = 'btn-hamburger';
-    btn.setAttribute('aria-label', 'Ouvrir le menu');
-    btn.setAttribute('type', 'button');
+    /* ── Bouton hamburger : utiliser celui du HTML, sinon créer ── */
+    var btn = document.getElementById('btn-hamburger');
+    if (!btn) {
+      var topbar = document.querySelector('.topbar');
+      if (!topbar) return;
+      btn = document.createElement('button');
+      btn.className = 'btn-hamburger';
+      btn.setAttribute('aria-label', 'Ouvrir le menu');
+      btn.setAttribute('type', 'button');
+      var svgNS = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('width', '20'); svg.setAttribute('height', '20');
+      svg.setAttribute('viewBox', '0 0 20 20'); svg.setAttribute('fill', 'currentColor');
+      ['3', '9', '15'].forEach(function (y) {
+        var r = document.createElementNS(svgNS, 'rect');
+        r.setAttribute('x', '1'); r.setAttribute('y', y);
+        r.setAttribute('width', '18'); r.setAttribute('height', '2'); r.setAttribute('rx', '1');
+        svg.appendChild(r);
+      });
+      btn.appendChild(svg);
+      topbar.insertBefore(btn, topbar.firstElementChild);
+    }
 
-    var svgNS = 'http://www.w3.org/2000/svg';
-    var svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('width', '18');
-    svg.setAttribute('height', '18');
-    svg.setAttribute('viewBox', '0 0 18 18');
-    svg.setAttribute('fill', 'currentColor');
-    ['2', '8', '14'].forEach(function (y) {
-      var rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('y', y);
-      rect.setAttribute('width', '18');
-      rect.setAttribute('height', '2');
-      rect.setAttribute('rx', '1');
-      svg.appendChild(rect);
-    });
-    btn.appendChild(svg);
-    topbar.insertBefore(btn, topbar.firstElementChild);
+    /* ── Appliquer les styles inline selon le mode ── */
+    function appliquerMobile() {
+      /* Forcer la sidebar en tiroir hors écran */
+      sidebar.style.setProperty('position', 'fixed', 'important');
+      sidebar.style.setProperty('top', '0', 'important');
+      sidebar.style.setProperty('left', '0', 'important');
+      sidebar.style.setProperty('bottom', '0', 'important');
+      sidebar.style.setProperty('height', '100vh', 'important');
+      sidebar.style.setProperty('width', '270px', 'important');
+      sidebar.style.setProperty('z-index', '999', 'important');
+      sidebar.style.setProperty('overflow-y', 'auto', 'important');
+      sidebar.style.setProperty('transition', 'transform .25s ease', 'important');
+      sidebar.style.setProperty('transform', isOpen ? 'translateX(0)' : 'translateX(-100%)', 'important');
+      /* Bouton hamburger visible */
+      btn.style.setProperty('display', 'flex', 'important');
+    }
 
-    function openMenu() {
-      sidebar.classList.add('open');
+    function reinitialiserDesktop() {
+      /* Retirer tous les styles inline */
+      sidebar.style.removeProperty('position');
+      sidebar.style.removeProperty('top');
+      sidebar.style.removeProperty('left');
+      sidebar.style.removeProperty('bottom');
+      sidebar.style.removeProperty('height');
+      sidebar.style.removeProperty('width');
+      sidebar.style.removeProperty('z-index');
+      sidebar.style.removeProperty('overflow-y');
+      sidebar.style.removeProperty('transition');
+      sidebar.style.removeProperty('transform');
+      btn.style.removeProperty('display');
+      overlay.classList.remove('open');
+      document.body.style.overflow = '';
+      isOpen = false;
+    }
+
+    function ouvrirMenu() {
+      isOpen = true;
+      sidebar.style.setProperty('transform', 'translateX(0)', 'important');
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
       btn.setAttribute('aria-label', 'Fermer le menu');
     }
-    function closeMenu() {
-      sidebar.classList.remove('open');
+
+    function fermerMenu() {
+      isOpen = false;
+      sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
       overlay.classList.remove('open');
       document.body.style.overflow = '';
       btn.setAttribute('aria-label', 'Ouvrir le menu');
     }
 
-    btn.addEventListener('click', function () {
-      sidebar.classList.contains('open') ? closeMenu() : openMenu();
-    });
-    overlay.addEventListener('click', closeMenu);
+    /* Fonction globale — utilisée aussi par l'onclick HTML du bouton */
+    window.toggleSidebar = function () {
+      isOpen ? fermerMenu() : ouvrirMenu();
+    };
 
-    /* Fermer quand un lien de nav est cliqué */
+    /* Initialisation */
+    if (window.innerWidth <= BREAKPOINT) appliquerMobile();
+    else reinitialiserDesktop();
+
+    btn.addEventListener('click', window.toggleSidebar);
+    overlay.addEventListener('click', fermerMenu);
+
     sidebar.querySelectorAll('.nav-item').forEach(function (item) {
-      item.addEventListener('click', closeMenu);
+      item.addEventListener('click', fermerMenu);
     });
 
-    /* Fermer si retour en mode desktop */
     window.addEventListener('resize', function () {
-      if (window.innerWidth > 768) closeMenu();
+      if (window.innerWidth <= BREAKPOINT) {
+        appliquerMobile();
+      } else {
+        reinitialiserDesktop();
+      }
     });
   })();
 
@@ -239,4 +288,63 @@ function buildSearchItem(uuid, nom, email, npi, ifu, onSelect) {
   return div;
 }
 
-/*
+/* ── Recherche AJAX justiciable (dans le formulaire d'envoi) ── */
+(function() {
+  const searchInput = document.getElementById('search-just');
+  const resultsDiv = document.getElementById('search-results');
+  const uuidField = document.getElementById('just-uuid');
+  if (!searchInput || !resultsDiv || !uuidField) return;
+
+  let timeout;
+
+  searchInput.addEventListener('input', function() {
+    clearTimeout(timeout);
+    const q = this.value.trim();
+    if (q.length < 2) { resultsDiv.style.display = 'none'; resultsDiv.innerHTML = ''; return; }
+    timeout = setTimeout(function() {
+      fetchSecure('/api/justiciables/rechercher/?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          resultsDiv.innerHTML = '';
+          if (!data.resultats || !data.resultats.length) {
+            resultsDiv.style.display = 'none';
+            return;
+          }
+          data.resultats.forEach(function(j) {
+            const item = buildSearchItem(j.uuid, j.nom, j.email, j.npi, j.ifu, function(uuid, nom, email) {
+              uuidField.value = uuid;
+              searchInput.value = nom + ' — ' + email;
+              resultsDiv.style.display = 'none';
+              resultsDiv.innerHTML = '';
+            });
+            resultsDiv.appendChild(item);
+          });
+          resultsDiv.style.display = 'block';
+        })
+        .catch(function() { resultsDiv.style.display = 'none'; });
+    }, 300);
+  });
+
+  /* Fermer si clic ailleurs */
+  document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+      resultsDiv.style.display = 'none';
+    }
+  });
+
+  /* Keyboard nav dans la liste */
+  searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown') {
+      const first = resultsDiv.querySelector('.search-item');
+      if (first) first.focus();
+      e.preventDefault();
+    }
+  });
+})();
+
+/* ── Export pour usage inline dans les templates ── */
+window.fetchSecure = fetchSecure;
+window.escapeHtml = escapeHtml;
+window.getCookie = getCookie;
+window.showSpinner = showSpinner;
+window.hideSpinner = hideSpinner;

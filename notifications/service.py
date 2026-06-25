@@ -2,6 +2,7 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template import Template, Context
 from django.conf import settings
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ def get_modele_email(type_email: str, langue: str = 'fr'):
         return None
 
 
-def envoyer_email(destinataire: str, sujet: str, corps_html: str, corps_texte: str = ''):
+def _envoyer_email_sync(destinataire: str, sujet: str, corps_html: str, corps_texte: str = ''):
+    """Envoi SMTP synchrone — appelé dans un thread background."""
     try:
         msg = EmailMultiAlternatives(
             subject=sujet,
@@ -24,10 +26,23 @@ def envoyer_email(destinataire: str, sujet: str, corps_html: str, corps_texte: s
         )
         msg.attach_alternative(corps_html, "text/html")
         msg.send()
-        return True
+        logger.info(f"Email envoyé avec succès à {destinataire}")
     except Exception as e:
         logger.error(f"Erreur envoi email à {destinataire}: {e}")
-        return False
+
+
+def envoyer_email(destinataire: str, sujet: str, corps_html: str, corps_texte: str = ''):
+    """
+    Lance l'envoi SMTP dans un thread daemon pour ne pas bloquer
+    le worker Gunicorn (évite le SystemExit sur timeout).
+    """
+    thread = threading.Thread(
+        target=_envoyer_email_sync,
+        args=(destinataire, sujet, corps_html, corps_texte),
+        daemon=True,
+    )
+    thread.start()
+    return True
 
 
 def envoyer_activation_huissier(email: str, token_brut: str, langue: str = 'fr'):

@@ -13,6 +13,76 @@
 {% endif %}
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
 {% block extra_head %}{% endblock %}
+<style>
+.btn-hamburger{display:none;align-items:center;justify-content:center;width:40px;height:40px;flex-shrink:0;background:#f0f2f7;border:1px solid #e2e5ee;border-radius:6px;cursor:pointer;color:#1a1a1a;margin-right:10px;}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:998;}
+.sidebar-overlay.open{display:block;}
+@media(max-width:768px){
+  .btn-hamburger{display:flex!important;}
+  .dashboard-layout{display:flex!important;flex-direction:column!important;}
+  .sidebar{position:fixed!important;top:0!important;left:0!important;bottom:0!important;width:270px!important;height:100vh!important;z-index:999!important;transform:translateX(-100%)!important;transition:transform .25s ease!important;overflow-y:auto!important;}
+  .sidebar.open{transform:translateX(0)!important;box-shadow:4px 0 24px rgba(0,0,0,.3)!important;}
+  .dashboard-main{width:100%!important;min-width:0!important;flex:1!important;}
+  .topbar{height:56px!important;padding:0 12px!important;}
+  .topbar-sub{display:none!important;}
+  .content-area{padding:12px!important;}
+  .stats-grid{grid-template-columns:repeat(2,1fr)!important;}
+  .stats-grid-5{grid-template-columns:repeat(2,1fr)!important;}
+  .two-col-grid{grid-template-columns:1fr!important;}
+  .grid-2{grid-template-columns:1fr!important;}
+  .form-row{grid-template-columns:1fr!important;}
+  .table-wrap{overflow-x:auto!important;-webkit-overflow-scrolling:touch;}
+}
+</style>
+<script>
+/* Hamburger sidebar — fonction disponible immediatement, sans attendre main.js */
+function toggleSidebar() {
+  var s = document.querySelector('.sidebar');
+  if (!s) return;
+  var ouvert = s.getAttribute('data-menu-ouvert') === '1';
+  if (ouvert) {
+    s.style.setProperty('transform', 'translateX(-100%)', 'important');
+    s.setAttribute('data-menu-ouvert', '0');
+    document.body.style.overflow = '';
+    var ov = document.getElementById('sidebar-overlay');
+    if (ov) ov.style.display = 'none';
+  } else {
+    s.style.setProperty('position', 'fixed', 'important');
+    s.style.setProperty('top', '0', 'important');
+    s.style.setProperty('left', '0', 'important');
+    s.style.setProperty('bottom', '0', 'important');
+    s.style.setProperty('height', '100vh', 'important');
+    s.style.setProperty('width', '270px', 'important');
+    s.style.setProperty('z-index', '999', 'important');
+    s.style.setProperty('overflow-y', 'auto', 'important');
+    s.style.setProperty('transition', 'transform .25s ease', 'important');
+    s.style.setProperty('transform', 'translateX(0)', 'important');
+    s.setAttribute('data-menu-ouvert', '1');
+    document.body.style.overflow = 'hidden';
+    var ov = document.getElementById('sidebar-overlay');
+    if (ov) ov.style.display = 'block';
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  /* Creer overlay si absent */
+  if (!document.getElementById('sidebar-overlay')) {
+    var ov = document.createElement('div');
+    ov.id = 'sidebar-overlay';
+    ov.className = 'sidebar-overlay';
+    ov.onclick = toggleSidebar;
+    document.body.appendChild(ov);
+  }
+  /* Fermer sidebar quand on clique un lien nav */
+  var sidebar = document.querySelector('.sidebar');
+  if (sidebar) {
+    sidebar.querySelectorAll('.nav-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        if (sidebar.getAttribute('data-menu-ouvert') === '1') toggleSidebar();
+      });
+    });
+  }
+});
+</script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <div id="spinner-global" class="spinner-overlay" style="display:none;" role="status">
@@ -30,18 +100,18 @@
       <path d="M50 38 Q52 34 48 32 L40 30" stroke="#1a3c6e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
       <rect x="46" y="36" width="8" height="5" rx="2" fill="#1a3c6e"/>
     </svg>
-    <p class="spinner-text">Chargement en cours…</p>
+    <p class="spinner-text">Chargement en cours...</p>
   </div>
 </div>
 {% if messages %}
 <div id="messages-container">
 {% for message in messages %}
-<div class="alert alert-{{ message.tags }}" role="alert">{{ message }}<button class="alert-close" onclick="this.parentElement.remove()">×</button></div>
+<div class="alert alert-{{ message.tags }}" role="alert">{{ message }}<button class="alert-close" onclick="this.parentElement.remove()">x</button></div>
 {% endfor %}
 </div>
 {% endif %}
 {% block body %}{% endblock %}
-<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/main.js' %}?v=3"></script>
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>
