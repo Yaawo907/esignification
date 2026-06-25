@@ -190,13 +190,45 @@ def _envoyer_confirmation_domicile(user, email_domicile):
     lien = f"{settings.SITE_URL}/confirmer-domicile/?token={token_brut}"
     from notifications.service import envoyer_email
     corps = f"""
-    <div style="font-family:Arial,sans-serif;padding:24px;">
-      <h2 style="color:#1a3c6e;">Confirmez votre domicile électronique</h2>
-      <p>Cliquez sur le lien ci-dessous pour confirmer votre adresse email d'élection de domicile :</p>
-      <p><a href="{lien}" style="background:#1a3c6e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;">Confirmer mon adresse</a></p>
-      <p style="color:#888;font-size:13px;">Ce lien est valable 48 heures.</p>
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:8px;">
+      <div style="background:#1a3c6e;padding:20px 24px;border-radius:6px 6px 0 0;margin:-24px -24px 24px -24px;">
+        <h1 style="color:#fff;margin:0;font-size:20px;font-weight:600;">e-Signification Bénin</h1>
+      </div>
+      <h2 style="color:#1a3c6e;font-size:18px;">Confirmez votre domicile électronique</h2>
+      <p style="color:#374151;">Cliquez sur le bouton ci-dessous pour confirmer votre adresse email d'élection de domicile :</p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;">
+        <tr>
+          <td align="center">
+            <table cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:#1a3c6e;border-radius:8px;padding:14px 32px;">
+                  <a href="{lien}" style="color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;display:inline-block;">
+                    ✉ Confirmer mon adresse
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <p style="color:#6b7280;font-size:13px;">Si le bouton ne fonctionne pas, copiez ce lien :</p>
+      <p style="word-break:break-all;font-size:12px;">
+        <a href="{lien}" style="color:#1a3c6e;">{lien}</a>
+      </p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">Ce lien est valable 48 heures.</p>
     </div>"""
-    envoyer_email(email_domicile, "Confirmez votre domicile électronique", corps)
+    corps_texte = f"""Confirmez votre domicile électronique
+
+Cliquez sur le lien suivant pour confirmer votre adresse :
+
+{lien}
+
+Ce lien est valable 48 heures.
+"""
+    envoyer_email(email_domicile, "Confirmez votre domicile électronique", corps, corps_texte)
 
 
 def confirmer_domicile(request):
