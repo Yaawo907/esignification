@@ -74,6 +74,7 @@ TEMPLATES = [
                 'django.template.context_processors.i18n',
                 'django.template.context_processors.csrf',
                 'administration.context_processors.config_plateforme',
+                'huissiers.context_processors.sidebar_huissier',
             ],
         },
     },

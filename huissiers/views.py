@@ -15,26 +15,7 @@ def _get_huissier(request):
     return request.user.profil_clerc.huissier
 
 
-def _sidebar_badges(request, huissier):
-    from justiciables.models import DemandeModificationProfil
-    from messagerie.models import Message
-    from django.db.models import Q
-    nb_demandes_modif = DemandeModificationProfil.objects.filter(
-        huissier=huissier, statut='en_attente'
-    ).count()
-    nb_messages_non_lus = Message.objects.filter(
-        Q(conversation__participant_1=request.user) | Q(conversation__participant_2=request.user),
-        lu=False,
-    ).exclude(auteur=request.user).count()
-    stats_en_attente = Signification.objects.filter(
-        huissier=huissier,
-        statut__in=['en_attente', 'relance_1', 'relance_2'],
-    ).count()
-    return {
-        'nb_demandes_modif': nb_demandes_modif,
-        'nb_messages_non_lus': nb_messages_non_lus,
-        'stats_en_attente': stats_en_attente,
-    }
+from .context_processors import sidebar_badges_for_huissier as _sidebar_badges
 
 
 def huissier_required(view_func):

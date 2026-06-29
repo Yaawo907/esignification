@@ -179,11 +179,7 @@ class InscriptionJusticiableForm(forms.Form):
     def clean_mot_de_passe(self):
         mdp = self.cleaned_data.get('mot_de_passe', '')
         if mdp:
-            user = User(
-                email=self.data.get('email_domicile', '').strip().lower(),
-                first_name=self.data.get('prenom', '').strip(),
-                last_name=self.data.get('nom', '').strip(),
-            )
+            user = User(email=self.data.get('email_domicile', '').strip().lower())
             try:
                 validate_password(mdp, user=user)
             except ValidationError as exc:

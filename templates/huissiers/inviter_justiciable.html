@@ -5,31 +5,7 @@
 {% block body %}
 <div class="dashboard-layout">
 
-  <!-- ── Sidebar ── -->
-  <aside class="sidebar sidebar-huissier">
-    <div class="sidebar-logo">
-      {% include 'base/_logo_sm.html' %}
-      <div>
-        <div class="logo-name">e-Signification</div>
-        <div class="logo-sub">Espace huissier</div>
-      </div>
-    </div>
-    <nav class="sidebar-nav">
-      <div class="nav-section">Principal</div>
-      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link">▦ Tableau de bord</a>
-      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link">✉ Significations</a>
-      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link">⌕ Rechercher</a>
-      <a href="{% url 'huissiers:inviter' %}" class="nav-item active">+ Inviter</a>
-    </nav>
-    <div class="sidebar-user">
-      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
-      <div>
-        <div class="user-name">{{ huissier.nom_complet }}</div>
-        <div class="user-role">{{ huissier.nom_etude }}</div>
-      </div>
-      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
-    </div>
-  </aside>
+  {% include 'huissiers/_sidebar.html' %}
 
   <!-- ── Contenu principal ── -->
   <main class="dashboard-main">
