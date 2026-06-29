@@ -8,10 +8,22 @@
     {% include 'base/_logo_lg.html' %}
     <h2 class="auth-title" style="margin-top:12px;">Vérification en deux étapes</h2>
     <p class="auth-subtitle">
-      {% if methode == 'email' %}Un code à 6 chiffres a été envoyé à votre adresse email.
-      {% elif methode == 'otp' %}Entrez le code de votre application d'authentification.
-      {% else %}Entrez le code reçu.{% endif %}
+      {% if methode == 'email' %}
+        Un code à 6 chiffres a été envoyé à <strong>{{ destinataire_masque }}</strong>.
+      {% elif methode == 'otp' %}
+        Un code à 6 chiffres a été envoyé par SMS au <strong>{{ destinataire_masque }}</strong>.
+      {% elif methode == 'totp' %}
+        Ouvrez votre application d'authentification (Google Authenticator, etc.) et entrez le code à 6 chiffres.
+      {% else %}
+        Entrez le code reçu.
+      {% endif %}
     </p>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }}" role="alert" style="margin-bottom:12px; font-size:13px;">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
 
     <form method="post" novalidate id="form-mfa">
       {% csrf_token %}
@@ -19,10 +31,8 @@
       <div class="form-error" role="alert">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      <!-- Champ caché pour le formulaire Django -->
       <input type="hidden" name="code" id="code-hidden">
 
-      <!-- 6 cases visuelles -->
       <div id="otp-boxes" style="display:flex; gap:10px; justify-content:center; margin:24px 0;">
         {% for i in "123456" %}
         <input type="text"
@@ -64,10 +74,17 @@
       </button>
     </form>
 
-    <p style="text-align:center; margin-top:16px; font-size:12px; color:var(--text-light);">
-      Vous n'avez pas reçu le code ?
+    <div style="text-align:center; margin-top:16px; font-size:12px; color:var(--text-light);">
+      {% if methode == 'email' or methode == 'otp' %}
+      <form method="post" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="renvoyer">
+        <button type="submit" class="btn btn-ghost btn-sm" style="font-size:12px;">Renvoyer le code</button>
+      </form>
+      <span style="margin:0 6px;">·</span>
+      {% endif %}
       <a href="{% url 'accounts:connexion' %}" style="color:var(--primary);">Recommencer</a>
-    </p>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -121,10 +138,9 @@
       if (e.key === 'ArrowRight' && idx < 5) { boxes[idx + 1].focus(); e.preventDefault(); return; }
     });
 
-    box.addEventListener('input', function(e) {
+    box.addEventListener('input', function() {
       var val = box.value.replace(/\D/g, '');
       if (val.length > 1) {
-        /* coller plusieurs chiffres d'un coup */
         for (var i = 0; i < val.length && idx + i < 6; i++) {
           boxes[idx + i].value = val[i];
         }
@@ -139,7 +155,6 @@
 
     box.addEventListener('focus', function() { box.select(); });
 
-    /* Gérer le collage (Ctrl+V) sur n'importe quelle case */
     box.addEventListener('paste', function(e) {
       e.preventDefault();
       var pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
@@ -151,7 +166,6 @@
     });
   });
 
-  /* Soumettre automatiquement quand les 6 cases sont remplies */
   form.addEventListener('input', function() {
     if (getCode().length === 6) {
       sync();
@@ -159,7 +173,6 @@
     }
   });
 
-  /* Focus sur la première case au chargement */
   boxes[0].focus();
 })();
 </script>

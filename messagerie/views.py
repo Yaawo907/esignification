@@ -1,10 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, Http404, HttpResponse
-from django.utils.html import escape
 from django.utils import timezone
 from django.db.models import Q
 from django.views.decorators.http import require_POST
+from html import unescape
 
 from accounts.models import User
 from securite.audit import journaliser
@@ -16,6 +16,20 @@ TYPES_AUTORISES = {'application/pdf', 'image/png', 'image/jpeg', 'image/jpg',
                    'application/msword',
                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
 EXTENSIONS_AUTORISEES = {'.pdf', '.png', '.jpg', '.jpeg', '.doc', '.docx'}
+
+
+def _texte_brut_post(valeur):
+    """Texte saisi — stocké tel quel (l'échappement HTML se fait à l'affichage)."""
+    return valeur.strip()
+
+
+def _texte_pour_affichage(texte):
+    """Compatibilité : anciens messages enregistrés avec escape() avant chiffrement."""
+    return unescape(texte) if texte else texte
+
+
+def _nom_fichier_pour_affichage(nom):
+    return unescape(nom) if nom else nom
 
 
 def _get_conversations(user):
@@ -47,35 +61,26 @@ def _nom_affichage(user):
     return user.email
 
 
-@login_required
-def liste_conversations(request):
-    user = request.user
-    conversations = _get_conversations(user)
+def _est_archivee_pour(conv, user):
+    if conv.participant_1_id == user.pk:
+        return conv.archivee_p1
+    return conv.archivee_p2
 
-    # Exclure les archivées selon le participant
-    conv_list = []
-    for c in conversations:
-        if c.participant_1_id == user.pk and c.archivee_p1:
-            continue
-        if c.participant_2_id == user.pk and c.archivee_p2:
-            continue
-        conv_list.append(c)
 
-    # Précomputer non_lus, autre_nom et snippet pour le template
+def _enrichir_conversations(user, conv_list):
     conv_enrichies = []
     total_non_lus = 0
     for c in conv_list:
         nl = c.non_lus_pour(user)
         total_non_lus += nl
         autre = c.autre_participant(user)
-        # Snippet + méta du dernier message
         snippet = ''
         dernier_auteur_moi = False
         a_pj = False
         try:
             dernier = c.messages.select_related('auteur').prefetch_related('pieces_jointes').order_by('-date_envoi').first()
             if dernier:
-                texte = dechiffrer_texte(bytes(dernier.contenu_chiffre).decode())
+                texte = _texte_pour_affichage(dechiffrer_texte(bytes(dernier.contenu_chiffre).decode()))
                 snippet = texte[:80].replace('\n', ' ')
                 if len(texte) > 80:
                     snippet += '…'
@@ -91,12 +96,36 @@ def liste_conversations(request):
             'snippet': snippet,
             'dernier_auteur_moi': dernier_auteur_moi,
             'a_pj': a_pj,
+            'est_archivee': _est_archivee_pour(c, user),
         })
+    return conv_enrichies, total_non_lus
+
+
+@login_required
+def liste_conversations(request):
+    user = request.user
+    vue_archives = request.GET.get('vue') == 'archives'
+    conversations = _get_conversations(user)
+
+    conv_list = []
+    for c in conversations:
+        archivee = _est_archivee_pour(c, user)
+        if vue_archives:
+            if archivee:
+                conv_list.append(c)
+        elif not archivee:
+            conv_list.append(c)
+
+    conv_enrichies, total_non_lus = _enrichir_conversations(user, conv_list)
+    if vue_archives:
+        total_non_lus = 0
 
     return render(request, 'messagerie/liste_conversations.html', {
         'conversations': conv_enrichies,
         'total_non_lus': total_non_lus,
         'nom_affichage': _nom_affichage(user),
+        'vue_archives': vue_archives,
+        'nb_archives': sum(1 for c in conversations if _est_archivee_pour(c, user)),
     })
 
 
@@ -116,7 +145,7 @@ def conversation(request, uuid):
     messages_affichage = []
     for msg in conv.messages.select_related('auteur').prefetch_related('pieces_jointes'):
         try:
-            contenu = dechiffrer_texte(bytes(msg.contenu_chiffre).decode())
+            contenu = _texte_pour_affichage(dechiffrer_texte(bytes(msg.contenu_chiffre).decode()))
         except Exception:
             contenu = "[Message illisible]"
         messages_affichage.append({
@@ -134,6 +163,8 @@ def conversation(request, uuid):
         'autre': autre,
         'autre_nom': _nom_affichage(autre),
         'moi_nom': _nom_affichage(user),
+        'sujet_conv': _texte_pour_affichage(conv.sujet),
+        'est_archivee': _est_archivee_pour(conv, user),
     })
 
 
@@ -145,7 +176,7 @@ def envoyer_message(request, uuid):
     if not conv.is_participant(user):
         return JsonResponse({'success': False, 'error': 'Accès refusé'}, status=403)
 
-    contenu_brut = escape(request.POST.get('contenu', '').strip())
+    contenu_brut = _texte_brut_post(request.POST.get('contenu', ''))
     fichiers = request.FILES.getlist('pieces_jointes')
 
     if not contenu_brut and not fichiers:
@@ -177,7 +208,7 @@ def envoyer_message(request, uuid):
         PieceJointeMessage.objects.create(
             message=msg,
             fichier_chiffre=chiffrer_fichier(contenu_pj),
-            nom_fichier=escape(f.name),
+            nom_fichier=f.name,
             taille_octets=f.size,
             type_mime=f.content_type or '',
         )
@@ -201,12 +232,12 @@ def envoyer_message(request, uuid):
 
     # Réponse AJAX avec le message rendu
     try:
-        contenu_dechiffre = dechiffrer_texte(bytes(msg.contenu_chiffre).decode())
+        contenu_dechiffre = _texte_pour_affichage(dechiffrer_texte(bytes(msg.contenu_chiffre).decode()))
     except Exception:
         contenu_dechiffre = contenu_brut
 
     pieces_data = [
-        {'uuid': str(pj.uuid), 'nom': pj.nom_fichier, 'taille': pj.taille_lisible}
+        {'uuid': str(pj.uuid), 'nom': _nom_fichier_pour_affichage(pj.nom_fichier), 'taille': pj.taille_lisible}
         for pj in msg.pieces_jointes.all()
     ]
 
@@ -246,10 +277,10 @@ def nouveaux_messages_ajax(request, uuid):
     data = []
     for msg in nouveaux:
         try:
-            contenu = dechiffrer_texte(bytes(msg.contenu_chiffre).decode())
+            contenu = _texte_pour_affichage(dechiffrer_texte(bytes(msg.contenu_chiffre).decode()))
         except Exception:
             contenu = "[Message illisible]"
-        pieces = [{'uuid': str(pj.uuid), 'nom': pj.nom_fichier, 'taille': pj.taille_lisible}
+        pieces = [{'uuid': str(pj.uuid), 'nom': _nom_fichier_pour_affichage(pj.nom_fichier), 'taille': pj.taille_lisible}
                   for pj in msg.pieces_jointes.all()]
         data.append({
             'uuid': str(msg.uuid),
@@ -269,8 +300,8 @@ def nouvelle_conversation(request):
 
     if request.method == 'POST':
         dest_uuid = request.POST.get('destinataire_uuid', '').strip()
-        sujet = escape(request.POST.get('sujet', '').strip())
-        contenu_brut = escape(request.POST.get('contenu', '').strip())
+        sujet = _texte_brut_post(request.POST.get('sujet', ''))[:255]
+        contenu_brut = _texte_brut_post(request.POST.get('contenu', ''))
 
         if not dest_uuid or not sujet or not contenu_brut:
             from django.contrib import messages as msg
@@ -306,7 +337,7 @@ def nouvelle_conversation(request):
         conv = Conversation.objects.create(
             participant_1=user,
             participant_2=dest,
-            sujet=sujet[:255],
+            sujet=sujet,
         )
 
         # Premier message
@@ -329,7 +360,7 @@ def nouvelle_conversation(request):
             PieceJointeMessage.objects.create(
                 message=premier_msg,
                 fichier_chiffre=chiffrer_fichier(contenu_pj),
-                nom_fichier=escape(f.name),
+                nom_fichier=f.name,
                 taille_octets=f.size,
                 type_mime=f.content_type or '',
             )
@@ -348,7 +379,7 @@ def nouvelle_conversation(request):
         return redirect('messagerie:conversation', uuid=conv.uuid)
 
     # GET : charger les destinataires possibles
-    q = escape(request.GET.get('q', '').strip())
+    q = request.GET.get('q', '').strip()
     destinataires = []
     if q and len(q) >= 2:
         roles_cibles = {
@@ -400,7 +431,7 @@ def telecharger_piece_jointe(request, uuid):
     journaliser(user, 'piece_jointe_telechargee', 'PieceJointeMessage', pj.uuid, request=request)
 
     response = HttpResponse(contenu, content_type=pj.type_mime or 'application/octet-stream')
-    response['Content-Disposition'] = f'attachment; filename="{pj.nom_fichier}"'
+    response['Content-Disposition'] = f'attachment; filename="{_nom_fichier_pour_affichage(pj.nom_fichier)}"'
     return response
 
 
@@ -410,6 +441,8 @@ def compter_non_lus(request):
     user = request.user
     total = 0
     for conv in _get_conversations(user):
+        if _est_archivee_pour(conv, user):
+            continue
         total += conv.non_lus_pour(user)
     return JsonResponse({'non_lus': total})
 
@@ -428,3 +461,19 @@ def archiver_conversation(request, uuid):
     conv.save(update_fields=['archivee_p1', 'archivee_p2'])
     journaliser(user, 'conversation_archivee', 'Conversation', conv.uuid, request=request)
     return redirect('messagerie:liste_conversations')
+
+
+@login_required
+@require_POST
+def desarchiver_conversation(request, uuid):
+    user = request.user
+    conv = get_object_or_404(Conversation, uuid=uuid)
+    if not conv.is_participant(user):
+        raise Http404
+    if conv.participant_1_id == user.pk:
+        conv.archivee_p1 = False
+    else:
+        conv.archivee_p2 = False
+    conv.save(update_fields=['archivee_p1', 'archivee_p2'])
+    journaliser(user, 'conversation_desarchivee', 'Conversation', conv.uuid, request=request)
+    return redirect('messagerie:conversation', uuid=conv.uuid)

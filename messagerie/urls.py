@@ -10,6 +10,7 @@ urlpatterns = [
     path('<uuid:uuid>/envoyer/', views.envoyer_message, name='envoyer_message'),
     path('<uuid:uuid>/nouveaux/', views.nouveaux_messages_ajax, name='nouveaux_messages'),
     path('<uuid:uuid>/archiver/', views.archiver_conversation, name='archiver'),
+    path('<uuid:uuid>/desarchiver/', views.desarchiver_conversation, name='desarchiver'),
     path('pj/<uuid:uuid>/', views.telecharger_piece_jointe, name='telecharger_pj'),
     path('non-lus/', views.compter_non_lus, name='non_lus'),
 ]

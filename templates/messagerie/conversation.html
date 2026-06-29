@@ -1,5 +1,5 @@
 {% extends 'base/base.html' %}
-{% block title %}{{ conv.sujet }}{% endblock %}
+{% block title %}{{ sujet_conv }}{% endblock %}
 {% block body_class %}dashboard-page{% endblock %}
 
 {% block body %}
@@ -11,20 +11,27 @@
     <!-- ── En-tête ── -->
     <header class="cv-header">
       <div class="cv-header-left">
-        <a href="{% url 'messagerie:liste_conversations' %}" class="cv-back" title="Retour messagerie">&#8592;</a>
+        <a href="{% if est_archivee %}{% url 'messagerie:liste_conversations' %}?vue=archives{% else %}{% url 'messagerie:liste_conversations' %}{% endif %}" class="cv-back" title="Retour messagerie">&#8592;</a>
         <div class="cv-avatar">{{ autre_nom|first|upper }}</div>
         <div class="cv-header-info">
           <div class="cv-header-nom">{{ autre_nom }}</div>
           <div class="cv-header-sub">
             <span class="cv-tls">&#128274; AES-256</span>
-            <span class="cv-sujet">{{ conv.sujet }}</span>
+            <span class="cv-sujet">{{ sujet_conv }}</span>
           </div>
         </div>
       </div>
+      {% if est_archivee %}
+      <form method="post" action="{% url 'messagerie:desarchiver' conv.uuid %}">{% csrf_token %}
+        <button type="submit" class="btn btn-ghost btn-sm"
+          onclick="return confirm('Restaurer cette conversation dans la boîte de réception ?')">&#8617; Restaurer</button>
+      </form>
+      {% else %}
       <form method="post" action="{% url 'messagerie:archiver' conv.uuid %}">{% csrf_token %}
         <button type="submit" class="btn btn-ghost btn-sm"
           onclick="return confirm('Archiver cette conversation ?')">&#128230; Archiver</button>
       </form>
+      {% endif %}
     </header>
 
     <!-- ── Zone messages ── -->
@@ -392,14 +399,27 @@ function getCookie(n) {
 .cv-pj-chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 11px; border-radius: 8px; font-size: 11px;
+  font-weight: 500;
   text-decoration: none; border: 1px solid rgba(0,0,0,.1);
-  cursor: pointer; transition: background .15s;
+  cursor: pointer; transition: background .15s, color .15s;
 }
-.cv-msg-moi  .cv-pj-chip { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.28); }
-.cv-msg-moi  .cv-pj-chip:hover { background: rgba(255,255,255,.3); }
-.cv-msg-autre .cv-pj-chip { background: #f3f4f6; color: var(--primary); border-color: #e2e8f0; }
-.cv-msg-autre .cv-pj-chip:hover { background: #e8f5ee; }
-.cv-pj-size { opacity: .65; font-size: 10px; }
+/* Messages envoyés — PJ sous la bulle, fond clair de la zone chat */
+.cv-msg-moi .cv-pj-chip {
+  background: var(--primary-bg);
+  color: var(--primary);
+  border-color: var(--primary-border);
+}
+.cv-msg-moi .cv-pj-chip:hover { background: #dce8f8; color: var(--primary-dark); }
+.cv-msg-moi .cv-pj-size { color: var(--primary-light); opacity: 1; }
+/* Messages reçus */
+.cv-msg-autre .cv-pj-chip {
+  background: #fff;
+  color: var(--text-primary);
+  border-color: #e2e8f0;
+}
+.cv-msg-autre .cv-pj-chip:hover { background: #f3f4f6; color: var(--primary); }
+.cv-msg-autre .cv-pj-size { color: var(--text-secondary); opacity: 1; }
+.cv-pj-size { font-size: 10px; }
 .cv-pj-del  { opacity: .55; cursor: pointer; margin-left: 3px; }
 .cv-pj-del:hover { opacity: 1; }
 
@@ -421,6 +441,7 @@ function getCookie(n) {
 .cv-pj-preview-list  { display: flex; flex-wrap: wrap; gap: 6px; }
 .cv-pj-sep { border-top: 1px solid var(--border-light); margin-top: 10px; }
 .cv-pj-chip-draft { background: #f3f4f6; color: var(--text-primary); border: 1px solid #e2e8f0; }
+.cv-pj-chip-draft .cv-pj-size { color: var(--text-secondary); }
 
 /* Textarea principale */
 .cv-textarea {

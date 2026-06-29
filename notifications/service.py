@@ -15,44 +15,53 @@ def get_modele_email(type_email: str, langue: str = 'fr'):
         return None
 
 
-def _envoyer_email_sync(destinataire: str, sujet: str, corps_html: str, corps_texte: str = ''):
-    """Envoi SMTP synchrone — appelé dans un thread background."""
-    try:
-        msg = EmailMultiAlternatives(
-            subject=sujet,
-            body=corps_texte or "Veuillez consulter la version HTML.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[destinataire],
-        )
-        msg.attach_alternative(corps_html, "text/html")
-        msg.send()
-        logger.info(f"Email envoyé avec succès à {destinataire}")
-    except Exception as e:
-        logger.error(f"Erreur envoi email à {destinataire}: {e}")
+def _envoyer_email_sync(destinataire: str, sujet: str, corps_html: str, corps_texte: str = '',
+                        pieces_jointes=None):
+    """Envoi SMTP synchrone — lève l'exception en cas d'échec."""
+    msg = EmailMultiAlternatives(
+        subject=sujet,
+        body=corps_texte or "Veuillez consulter la version HTML.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[destinataire],
+    )
+    msg.attach_alternative(corps_html, "text/html")
+    for piece in pieces_jointes or []:
+        if len(piece) == 3:
+            msg.attach(piece[0], piece[1], piece[2])
+    msg.send()
+    logger.info(f"Email envoyé avec succès à {destinataire}")
 
 
-def envoyer_email(destinataire: str, sujet: str, corps_html: str, corps_texte: str = ''):
+def envoyer_email(destinataire: str, sujet: str, corps_html: str, corps_texte: str = '',
+                  pieces_jointes=None):
     """
     Lance l'envoi SMTP dans un thread daemon pour ne pas bloquer
     le worker Gunicorn (évite le SystemExit sur timeout).
     """
-    thread = threading.Thread(
-        target=_envoyer_email_sync,
-        args=(destinataire, sujet, corps_html, corps_texte),
-        daemon=True,
-    )
+    def _thread_target():
+        try:
+            _envoyer_email_sync(destinataire, sujet, corps_html, corps_texte, pieces_jointes)
+        except Exception as e:
+            logger.error(f"Erreur envoi email à {destinataire}: {e}")
+
+    thread = threading.Thread(target=_thread_target, daemon=True)
     thread.start()
     return True
 
 
-def envoyer_activation_huissier(email: str, token_brut: str, langue: str = 'fr'):
+def envoyer_activation_huissier(email: str, token_brut: str, langue: str = 'fr', lien: str = None, sync: bool = False):
     from django.conf import settings
-    lien = f"{settings.SITE_URL}/inscription/huissier/?token={token_brut}"
+    if lien is None:
+        lien = f"{settings.SITE_URL.rstrip('/')}/inscription/huissier/?token={token_brut}"
     modele = get_modele_email('activation_huissier', langue)
+    ctx = Context({
+        'lien_activation': lien,
+        'email': email,
+        'expiry_heures': settings.ACTIVATION_TOKEN_EXPIRY_HOURS,
+    })
     if modele:
-        t = Template(modele.corps_html)
-        corps = t.render(Context({'lien_activation': lien, 'email': email, 'expiry_heures': settings.ACTIVATION_TOKEN_EXPIRY_HOURS}))
-        sujet = modele.sujet
+        corps = Template(modele.corps_html).render(ctx)
+        sujet = Template(modele.sujet).render(ctx)
     else:
         sujet = "Activez votre compte — e-Signification Bénin"
         corps = f"""
@@ -102,6 +111,9 @@ Cliquez sur le lien suivant pour activer votre compte :
 
 Ce lien est valable {settings.ACTIVATION_TOKEN_EXPIRY_HOURS} heures.
 """
+    if sync:
+        _envoyer_email_sync(email, sujet, corps, corps_texte)
+        return True
     return envoyer_email(email, sujet, corps, corps_texte)
 
 
@@ -165,23 +177,59 @@ def envoyer_signification(justiciable, signification, token_accepter: str, token
 
 
 def envoyer_certificat(signification, certificat, langue: str = 'fr'):
-    from django.conf import settings
+    from django.utils import timezone as tz
+    from securite.chiffrement import dechiffrer_fichier
     from administration.models import ConfigurationPlateforme
     config = ConfigurationPlateforme.get()
     huissier = signification.huissier
     justiciable = signification.justiciable
+
+    date_rec = certificat.date_reception
+    if tz.is_aware(date_rec):
+        date_rec = tz.localtime(date_rec)
+    date_reception_fmt = date_rec.strftime('%d/%m/%Y à %Hh%Mm%Ss')
+    tz_label = certificat.timezone_reception or 'Africa/Porto-Novo'
+
     sujet = f"Certificat de signification — {signification.reference}"
+    nom_pdf = f"certificat_{signification.reference}.pdf"
+    pieces_jointes = []
+    if certificat.fichier_certificat_chiffre:
+        try:
+            pdf_data = dechiffrer_fichier(bytes(certificat.fichier_certificat_chiffre))
+            pieces_jointes = [(nom_pdf, pdf_data, 'application/pdf')]
+        except Exception as e:
+            logger.error(f"Impossible de joindre le PDF certificat {signification.reference}: {e}")
+
+    mention_pj = (
+        f"<p>Le certificat officiel est joint à cet email au format <strong>PDF</strong> "
+        f"(<em>{nom_pdf}</em>) — document imprimable.</p>"
+        if pieces_jointes else
+        "<p>Le certificat PDF n'a pas pu être joint ; consultez votre espace sur la plateforme.</p>"
+    )
     corps = f"""
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
       <h2 style="color:#1a3c6e;">Certificat de signification électronique</h2>
       <p>Référence : <strong>{signification.reference}</strong></p>
       <p>Acte réceptionné par : <strong>{justiciable.nom_complet}</strong></p>
-      <p>Date et heure de réception : <strong>{certificat.date_reception.strftime('%d/%m/%Y à %Hh%Mm%Ss')}</strong> (heure de {certificat.timezone_reception})</p>
+      <p>Date et heure de réception : <strong>{date_reception_fmt}</strong> (heure de {tz_label})</p>
       <p>Ce certificat atteste que l'acte a été remis électroniquement à la date et heure indiquées.</p>
-      <p style="color:#888;font-size:12px;">Vous pouvez consulter et télécharger ce certificat depuis votre espace sur la plateforme.</p>
+      {mention_pj}
+      <p style="color:#888;font-size:12px;">Vous pouvez également consulter et télécharger ce certificat depuis votre espace sur {config.nom_plateforme}.</p>
     </div>"""
-    envoyer_email(huissier.user.email, sujet, corps)
-    envoyer_email(justiciable.email_domicile, sujet, corps)
+    corps_texte = f"""Certificat de signification électronique
+
+Référence : {signification.reference}
+Acte réceptionné par : {justiciable.nom_complet}
+Date et heure de réception : {date_reception_fmt} (heure de {tz_label})
+
+Ce certificat atteste que l'acte a été remis électroniquement à la date et heure indiquées.
+"""
+    if pieces_jointes:
+        corps_texte += f"\nLe certificat PDF imprimable est joint à cet email ({nom_pdf}).\n"
+    corps_texte += f"\nConsultez également votre espace sur {config.nom_plateforme}.\n"
+
+    envoyer_email(huissier.user.email, sujet, corps, corps_texte, pieces_jointes)
+    envoyer_email(justiciable.email_domicile, sujet, corps, corps_texte, pieces_jointes)
 
 
 def envoyer_recuperation_mdp(email: str, token_brut: str, langue: str = 'fr'):
@@ -200,6 +248,92 @@ def envoyer_recuperation_mdp(email: str, token_brut: str, langue: str = 'fr'):
       <p style="color:#888;font-size:13px;">Ce lien est valable 2 heures. Si vous n'avez pas fait cette demande, ignorez cet email.</p>
     </div>"""
     return envoyer_email(email, sujet, corps)
+
+
+def envoyer_preuve_yousign_huissier(signification, pdf_signe=None, audit_trail_pdf=None):
+    """
+    Envoie à l'huissier la preuve de signature Yousign (audit trail + acte signé).
+    Appelé après signature_request.done (webhook ou sync).
+    """
+    from administration.models import ConfigurationPlateforme
+    config = ConfigurationPlateforme.get()
+    huissier = signification.huissier
+    justiciable = signification.justiciable
+
+    nom_acte = f"acte_signe_{signification.reference}.pdf"
+    nom_preuve = f"preuve_yousign_{signification.reference}.pdf"
+    pieces_jointes = []
+
+    if pdf_signe:
+        pieces_jointes.append((nom_acte, pdf_signe, 'application/pdf'))
+    elif signification.fichier_chiffre:
+        try:
+            from securite.chiffrement import dechiffrer_fichier
+            pieces_jointes.append((
+                nom_acte,
+                dechiffrer_fichier(bytes(signification.fichier_chiffre)),
+                'application/pdf',
+            ))
+        except Exception as e:
+            logger.error("Preuve Yousign : acte signé non joint pour %s — %s",
+                         signification.reference, e)
+
+    if audit_trail_pdf:
+        pieces_jointes.append((nom_preuve, audit_trail_pdf, 'application/pdf'))
+    elif signification.yousign_audit_trail_chiffre:
+        try:
+            from securite.chiffrement import dechiffrer_fichier
+            pieces_jointes.append((
+                nom_preuve,
+                dechiffrer_fichier(bytes(signification.yousign_audit_trail_chiffre)),
+                'application/pdf',
+            ))
+        except Exception as e:
+            logger.error("Preuve Yousign : audit trail non joint pour %s — %s",
+                         signification.reference, e)
+
+    mention_pj = ''
+    if any(p[0] == nom_preuve for p in pieces_jointes):
+        mention_pj = (
+            f"<p>Le <strong>dossier de preuve Yousign</strong> (audit trail) est joint "
+            f"à cet email (<em>{nom_preuve}</em>). Il atteste l'authenticité de votre "
+            f"signature électronique (horodatage, OTP SMS, certificat).</p>"
+        )
+    if any(p[0] == nom_acte for p in pieces_jointes):
+        mention_pj += (
+            f"<p>L'<strong>acte signé</strong> est également joint (<em>{nom_acte}</em>).</p>"
+        )
+    if not mention_pj:
+        mention_pj = (
+            "<p>Consultez votre espace huissier pour télécharger l'acte signé "
+            "et le dossier de preuve.</p>"
+        )
+
+    sujet = f"Preuve de signature électronique — {signification.reference}"
+    corps = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+      <h2 style="color:#0d6e4f;">✓ Signature électronique confirmée</h2>
+      <p>Maître <strong>{huissier.prenom} {huissier.nom}</strong>,</p>
+      <p>Votre signature électronique (Yousign) pour l'acte
+      <strong>{signification.reference}</strong> a été enregistrée avec succès.</p>
+      <p>L'acte a été transmis au justiciable <strong>{justiciable.nom_complet}</strong>
+      ({justiciable.email_domicile}).</p>
+      {mention_pj}
+      <p style="color:#888;font-size:12px;">
+        Conservez le dossier de preuve Yousign — il constitue la trace probatoire
+        de votre signature (Signature Électronique Avancée).
+      </p>
+      <p style="color:#888;font-size:12px;">{config.nom_plateforme}</p>
+    </div>"""
+    corps_texte = f"""Signature électronique confirmée
+
+Référence : {signification.reference}
+Destinataire : {justiciable.nom_complet} ({justiciable.email_domicile})
+
+Votre signature Yousign a été enregistrée. L'acte a été transmis au justiciable.
+Consultez les pièces jointes ou votre espace huissier pour le dossier de preuve.
+"""
+    return envoyer_email(huissier.user.email, sujet, corps, corps_texte, pieces_jointes)
 
 
 def envoyer_yousign_expiree(signification, raison: str = 'expired'):

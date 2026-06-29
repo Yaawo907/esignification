@@ -3,7 +3,8 @@ Service Yousign API v3 pour e-Signification Benin.
 
 Architecture :
   - UN SEUL token API au niveau plateforme (gere par l admin).
-  - L HUISSIER est le signataire. Yousign lui envoie un lien par email.
+  - L HUISSIER est le signataire. Yousign lui envoie un lien par email
+    et un code OTP par SMS pour autoriser la signature.
   - Apres signature, le webhook declenche l envoi de l acte signe au justiciable.
 
 Flux :
@@ -27,6 +28,23 @@ YOUSIGN_BASE_URL = {
     'sandbox': 'https://api-sandbox.yousign.app/v3',
     'production': 'https://api.yousign.app/v3',
 }
+
+
+def message_erreur_yousign_api(detail: str) -> str:
+    """Traduit une réponse d'erreur Yousign en message utilisateur (français)."""
+    err = (detail or '').lower()
+    if 'sandbox mode' in err and 'email' in err and 'organization' in err:
+        return (
+            "Yousign (sandbox) : l'email de l'huissier doit appartenir à votre organisation "
+            "Yousign. Pour les tests, utilisez l'email du compte Yousign, ou contactez "
+            "le support Yousign pour lever cette restriction."
+        )
+    if 'phone_number' in err:
+        return (
+            "Yousign a refusé le numéro de téléphone. "
+            "Format attendu : +22901XXXXXXXX (ex. +2290166004617)."
+        )
+    return ''
 
 
 def _get_config():
@@ -134,8 +152,18 @@ def creer_demande_signature(signification, pdf_bytes):
     Retourne le signature_request_id.
     Met a jour signification.yousign_signature_request_id et yousign_statut.
     """
+    from notifications.sms import normaliser_telephone_yousign
+
     api_key, mode = _get_config()
     huissier = signification.huissier
+    try:
+        phone_number = normaliser_telephone_yousign(huissier.telephone)
+    except ValueError:
+        raise
+    except Exception:
+        raise ValueError(
+            "Numéro de téléphone huissier invalide pour l'OTP SMS Yousign."
+        ) from None
 
     # 1. Creer la signature_request
     sig_req = _json_request('POST', '/signature_requests', api_key, mode, body={
@@ -161,7 +189,7 @@ def creer_demande_signature(signification, pdf_bytes):
     doc_id = doc['id']
     logger.info("Yousign : document uploade %s", doc_id)
 
-    # 3. Ajouter l huissier comme signataire (OTP email)
+    # 3. Ajouter l huissier comme signataire (lien email + OTP SMS)
     signer = _json_request(
         'POST',
         '/signature_requests/' + sig_req_id + '/signers',
@@ -171,10 +199,11 @@ def creer_demande_signature(signification, pdf_bytes):
                 'first_name': huissier.prenom,
                 'last_name': huissier.nom,
                 'email': huissier.user.email,
+                'phone_number': phone_number,
                 'locale': 'fr',
             },
             'signature_level': 'electronic_signature',
-            'signature_authentication_mode': 'otp_email',
+            'signature_authentication_mode': 'otp_sms',
             'fields': [
                 {
                     'type': 'signature',
@@ -190,15 +219,23 @@ def creer_demande_signature(signification, pdf_bytes):
     )
     logger.info("Yousign : signataire ajoute %s", signer.get('id'))
 
-    # 4. Activer -> Yousign envoie email a l huissier
+    # 4. Activer -> Yousign envoie le lien par email ; l OTP arrive par SMS a la signature
     _json_request('POST', '/signature_requests/' + sig_req_id + '/activate', api_key, mode)
     logger.info("Yousign : signature_request %s activee", sig_req_id)
 
     signification.yousign_signature_request_id = sig_req_id
+    signification.yousign_signer_id = signer.get('id', '')
     signification.yousign_statut = 'ongoing'
-    signification.save(update_fields=['yousign_signature_request_id', 'yousign_statut'])
+    signification.save(update_fields=['yousign_signature_request_id', 'yousign_signer_id', 'yousign_statut'])
 
     return sig_req_id
+
+
+def recuperer_statut_yousign(sig_req_id: str) -> str:
+    """Interroge Yousign pour le statut d'une signature_request."""
+    api_key, mode = _get_config()
+    data = _json_request('GET', '/signature_requests/' + sig_req_id, api_key, mode)
+    return data.get('status', '')
 
 
 def telecharger_document_signe(sig_req_id, doc_id=None):
@@ -216,14 +253,58 @@ def telecharger_document_signe(sig_req_id, doc_id=None):
     )
 
 
-def valider_webhook(payload_bytes, signature_header):
-    """Valide la signature HMAC-SHA256 du callback Yousign."""
+def recuperer_signataire_id(sig_req_id, signer_id=None):
+    """Retourne l'ID du premier signataire si signer_id absent."""
+    if signer_id:
+        return signer_id
+    api_key, mode = _get_config()
+    data = _json_request('GET', '/signature_requests/' + sig_req_id + '/signers', api_key, mode)
+    signers = data if isinstance(data, list) else data.get('data', [])
+    if not signers:
+        raise RuntimeError("Aucun signataire dans la signature_request.")
+    return signers[0]['id']
+
+
+def telecharger_audit_trail(sig_req_id, signer_id=None):
+    """Telecharge le dossier de preuve Yousign (audit trail PDF) du signataire."""
+    api_key, mode = _get_config()
+    sid = recuperer_signataire_id(sig_req_id, signer_id)
+    return _download_bytes(
+        api_key, mode,
+        '/signature_requests/' + sig_req_id + '/signers/' + sid + '/audit_trails/download',
+    )
+
+
+def _get_webhook_secret():
+    """Secret HMAC Yousign : base (prod) puis .env en secours (dev)."""
+    from django.conf import settings
     from administration.models import ConfigurationPlateforme
     from securite.chiffrement import dechiffrer_texte
+
+    env_secret = getattr(settings, 'YOUSIGN_WEBHOOK_SECRET', '').strip()
+    if getattr(settings, 'DEBUG', False) and env_secret:
+        return env_secret
+
     config = ConfigurationPlateforme.get()
-    if not config.yousign_webhook_secret_chiffre:
+    if config.yousign_webhook_secret_chiffre:
+        return dechiffrer_texte(config.yousign_webhook_secret_chiffre)
+
+    return env_secret
+
+
+def valider_webhook(payload_bytes, signature_header):
+    """Valide la signature HMAC-SHA256 du callback Yousign."""
+    secret = _get_webhook_secret()
+    if not secret:
         logger.warning("Webhook Yousign : secret non configure - accepte sans validation.")
         return True
-    secret = dechiffrer_texte(config.yousign_webhook_secret_chiffre).encode('utf-8')
-    expected = 'sha256=' + hmac.new(secret, payload_bytes, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature_header or '')
+    expected = 'sha256=' + hmac.new(
+        secret.encode('utf-8'), payload_bytes, hashlib.sha256,
+    ).hexdigest()
+    if hmac.compare_digest(expected, signature_header or ''):
+        return True
+    logger.warning(
+        "Webhook Yousign : signature invalide (header present=%s)",
+        bool(signature_header),
+    )
+    return False

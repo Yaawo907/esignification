@@ -1,0 +1,110 @@
+<div class="card" style="margin-bottom:20px; padding:20px 24px;">
+  <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:16px;">
+    Vérification en deux étapes (2FA)
+  </div>
+  <p class="form-hint" style="margin-bottom:16px;">
+    À chaque connexion, un second facteur est demandé. Par défaut : <strong>code par email</strong>.
+  </p>
+
+  {% if totp_setup %}
+  <div class="mfa-totp-setup">
+    <div style="background:#fffbea;border:1px solid #d97706;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#854f0b;">
+      <strong>Activation en cours</strong> — la connexion par email reste active tant que vous n'avez pas validé l'étape 3 ci-dessous.
+    </div>
+    <p style="font-size:13px; margin-bottom:12px;">
+      <strong>Étape 1 —</strong> Installez <em>Google Authenticator</em> (ou compatible TOTP) sur votre téléphone.
+    </p>
+    <p style="font-size:13px; margin-bottom:12px;">
+      <strong>Étape 2 —</strong> Scannez ce QR code :
+    </p>
+    <div style="text-align:center; margin:16px 0;">
+      <img src="{{ totp_setup.qr_data_uri }}" alt="QR code Google Authenticator" width="180" height="180"
+        style="border:1px solid var(--border); border-radius:8px; padding:8px; background:#fff;">
+    </div>
+    <p style="font-size:11px; color:var(--text-light); word-break:break-all; margin-bottom:16px;">
+      Clé manuelle : <code style="font-family:monospace;">{{ totp_setup.secret }}</code>
+    </p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="totp_confirmer">
+      <div class="form-group">
+        <label class="form-label" for="totp_code">Étape 3 — Code à 6 chiffres de l'application *</label>
+        <input type="text" name="totp_code" id="totp_code" class="form-input"
+          inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code"
+          placeholder="000000" style="max-width:160px; font-family:monospace; letter-spacing:.2em;">
+      </div>
+      <div style="display:flex; gap:10px; margin-top:12px; align-items:center;">
+        <button type="submit" class="btn btn-primary btn-spinner" data-loading="Vérification…">
+          Activer Authenticator
+        </button>
+      </div>
+    </form>
+    <form method="post" style="margin-top:10px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="totp_annuler">
+      <button type="submit" class="btn btn-ghost btn-sm">Annuler</button>
+    </form>
+  </div>
+  {% else %}
+
+  <div class="mfa-method-current" style="margin-bottom:16px; padding:12px 16px; background:var(--primary-bg); border-radius:8px; border:1px solid var(--primary-border);">
+    <span style="font-size:12px; color:var(--text-secondary);">Méthode active :</span>
+    <strong style="color:var(--primary); margin-left:6px;">
+      {% for opt in mfa_options %}{% if opt.val == mfa_methode %}{{ opt.label }}{% endif %}{% endfor %}
+    </strong>
+    {% if totp_actif %}<span style="margin-left:8px; font-size:11px; color:var(--green);">✓ Configuré</span>{% endif %}
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="mfa_methode">
+    <div class="mfa-options" style="display:flex; flex-direction:column; gap:10px;">
+      {% for opt in mfa_options %}
+      <label class="mfa-option {% if mfa_methode == opt.val %}mfa-option-active{% endif %}{% if opt.disabled %} mfa-option-disabled{% endif %}">
+        <input type="radio" name="mfa_methode" value="{{ opt.val }}"
+          {% if mfa_methode == opt.val %}checked{% endif %}
+          {% if opt.disabled %}disabled{% endif %}>
+        <span>
+          <strong>
+            {{ opt.label }}
+            {% if opt.badge %}
+            <span class="mfa-badge-soon">{{ opt.badge }}</span>
+            {% endif %}
+          </strong>
+          <span class="mfa-option-desc">{{ opt.desc }}</span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+    <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+      <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+        Enregistrer la méthode 2FA
+      </button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<style>
+.mfa-option {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.mfa-option:hover:not(.mfa-option-disabled) { background: #f8fafc; }
+.mfa-option-active { border-color: var(--primary); background: var(--primary-bg); }
+.mfa-option-disabled {
+  opacity: .65; cursor: not-allowed; background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+.mfa-option-disabled input { cursor: not-allowed; }
+.mfa-option input { margin-top: 3px; accent-color: var(--primary); }
+.mfa-option span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.mfa-option-desc { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
+.mfa-badge-soon {
+  display: inline-block; margin-left: 6px; padding: 2px 8px;
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: #854f0b; background: #fffbea; border: 1px solid #fcd34d; border-radius: 999px;
+  vertical-align: middle;
+}
+</style>

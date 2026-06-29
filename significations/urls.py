@@ -5,6 +5,7 @@ urlpatterns = [
     path('envoyer/', views.envoyer_signification, name='envoyer'),
     path('repondre/<uuid:uuid>/', views.repondre_signification, name='repondre'),
     path('acte/<uuid:uuid>/telecharger/', views.telecharger_acte, name='telecharger_acte'),
+    path('preuve-yousign/<uuid:uuid>/telecharger/', views.telecharger_preuve_yousign, name='telecharger_preuve_yousign'),
     path('certificat/<uuid:uuid>/telecharger/', views.telecharger_certificat, name='telecharger_certificat'),
     path('<uuid:uuid>/reponse/', views.voir_reponse, name='voir_reponse'),
     path('<uuid:uuid>/reponse/telecharger/', views.telecharger_reponse, name='telecharger_reponse'),

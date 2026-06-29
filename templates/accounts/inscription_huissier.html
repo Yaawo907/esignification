@@ -5,7 +5,6 @@
 <div class="auth-container" style="max-width:600px;">
   <div class="auth-card">
 
-    <!-- Boutons navigation en haut -->
     <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
       <a href="/" class="btn btn-ghost btn-sm">← Accueil</a>
       <a href="{% url 'accounts:connexion' %}" class="btn btn-ghost btn-sm">Se connecter →</a>
@@ -16,10 +15,24 @@
       Email : <strong>{{ email }}</strong> — Complétez votre profil pour finaliser l'activation.
     </p>
 
-    <form method="post" novalidate>
+    <form method="post" action="{% url 'accounts:inscription_huissier' %}" novalidate>
       {% csrf_token %}
-      {% if form.non_field_errors %}
-        <div class="form-error" role="alert">{{ form.non_field_errors }}</div>
+      <input type="hidden" name="token" value="{{ token }}">
+
+      {% if form.errors %}
+      <div class="form-error" role="alert">
+        <strong>Veuillez corriger les erreurs ci-dessous :</strong>
+        <ul style="margin:8px 0 0 18px;padding:0;">
+          {% for field in form %}
+            {% for error in field.errors %}
+              <li>{{ field.label }} — {{ error }}</li>
+            {% endfor %}
+          {% endfor %}
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
       {% endif %}
 
       <div class="form-row">
@@ -41,66 +54,63 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Numéro IFU *</label>{{ form.ifu }}
+          {% if form.ifu.errors %}<p class="field-error">{{ form.ifu.errors.0 }}</p>{% endif %}
         </div>
         <div class="form-group">
           <label class="form-label">Numéro NPI *</label>{{ form.npi }}
+          {% if form.npi.errors %}<p class="field-error">{{ form.npi.errors.0 }}</p>{% endif %}
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Adresse professionnelle *</label>{{ form.adresse }}
+        {% if form.adresse.errors %}<p class="field-error">{{ form.adresse.errors.0 }}</p>{% endif %}
       </div>
 
       <div class="form-group">
         <label class="form-label">Téléphone *</label>{{ form.telephone }}
+        {% if form.telephone.errors %}<p class="field-error">{{ form.telephone.errors.0 }}</p>{% endif %}
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Mot de passe *</label>{{ form.mot_de_passe }}
+          <p class="form-hint" style="font-size:12px;color:var(--text-light);margin-top:4px;">
+            Min. 10 caractères, lettres et chiffres recommandés.
+          </p>
+          {% if form.mot_de_passe.errors %}<p class="field-error">{{ form.mot_de_passe.errors.0 }}</p>{% endif %}
         </div>
         <div class="form-group">
           <label class="form-label">Confirmer *</label>{{ form.confirmer_mdp }}
+          {% if form.confirmer_mdp.errors %}<p class="field-error">{{ form.confirmer_mdp.errors.0 }}</p>{% endif %}
         </div>
       </div>
 
-      <!-- Case CGU avec liens de lecture -->
       <div class="form-group" style="display:flex;align-items:flex-start;gap:10px;margin-top:8px;">
         {{ form.accepter_cgu }}
-        <label style="font-size:13px;line-height:1.6;cursor:pointer;">
+        <label for="{{ form.accepter_cgu.id_for_label }}" style="font-size:13px;line-height:1.6;cursor:pointer;">
           J'ai lu et j'accepte les
-          <a href="/cgu/" target="_blank"
+          <a href="{% url 'cgu' %}" target="_blank" rel="noopener noreferrer"
              style="color:#1a3c6e;font-weight:600;text-decoration:underline;">
             Conditions Générales d'Utilisation
           </a>
           et la
-          <a href="/confidentialite/" target="_blank"
+          <a href="{% url 'confidentialite' %}" target="_blank" rel="noopener noreferrer"
              style="color:#1a3c6e;font-weight:600;text-decoration:underline;">
             Politique de confidentialité
           </a>
         </label>
       </div>
+      {% if form.accepter_cgu.errors %}<p class="field-error">{{ form.accepter_cgu.errors.0 }}</p>{% endif %}
 
-      <!-- Bouton activation -->
       <button type="submit" class="btn btn-primary btn-full btn-spinner"
               data-loading="Activation en cours…" style="margin-top:16px;">
         <span class="btn-text">Activer mon compte</span>
-        <span class="btn-loader" style="display:none;">
-          <svg class="spin-icon" viewBox="0 0 24 24" width="16" height="16">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"
-                    fill="none" opacity="0.3"/>
-            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3"
-                  fill="none" stroke-linecap="round">
-              <animateTransform attributeName="transform" type="rotate"
-                from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/>
-            </path>
-          </svg>
-        </span>
+        <span class="btn-loader" style="display:none;"></span>
       </button>
 
     </form>
 
-    <!-- Boutons navigation en bas -->
     <div style="display:flex;justify-content:space-between;margin-top:20px;
                 padding-top:16px;border-top:1px solid #e2e5ee;">
       <a href="/" class="btn btn-ghost btn-sm">← Retour à l'accueil</a>

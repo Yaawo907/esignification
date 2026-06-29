@@ -1,0 +1,67 @@
+<div class="mdp-exigences" id="mdp-exigences" aria-live="polite">
+  <p class="mdp-exigences-titre">Votre mot de passe doit respecter les critères suivants :</p>
+  <ul class="mdp-exigences-list">
+    <li class="mdp-rule" data-rule="length" id="mdp-rule-length">
+      <span class="mdp-rule-icon" aria-hidden="true">○</span>
+      Au moins 10 caractères
+    </li>
+    <li class="mdp-rule" data-rule="numeric" id="mdp-rule-numeric">
+      <span class="mdp-rule-icon" aria-hidden="true">○</span>
+      Ne pas être composé uniquement de chiffres
+    </li>
+    <li class="mdp-rule" data-rule="match" id="mdp-rule-match">
+      <span class="mdp-rule-icon" aria-hidden="true">○</span>
+      Correspondre à la confirmation
+    </li>
+    <li class="mdp-rule mdp-rule-info" data-rule="info">
+      <span class="mdp-rule-icon" aria-hidden="true">·</span>
+      Ne pas être un mot de passe courant ni trop proche de votre nom ou email
+    </li>
+  </ul>
+</div>
+
+<style>
+.mdp-exigences {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #f7f9fc;
+  border: 1px solid var(--border, #e2e5ee);
+  border-radius: 6px;
+}
+.mdp-exigences-titre {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #4a5568);
+  margin: 0 0 8px;
+}
+.mdp-exigences-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mdp-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-light, #718096);
+  transition: color .15s ease;
+}
+.mdp-rule-icon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-weight: 700;
+}
+.mdp-rule.ok { color: var(--green, #276749); }
+.mdp-rule.ok .mdp-rule-icon::before { content: '✓'; }
+.mdp-rule.ok .mdp-rule-icon { font-size: 0; }
+.mdp-rule.ko { color: var(--red, #c53030); }
+.mdp-rule.ko .mdp-rule-icon::before { content: '✕'; }
+.mdp-rule.ko .mdp-rule-icon { font-size: 0; }
+.mdp-rule-info { color: var(--text-light, #718096); font-style: italic; }
+</style>

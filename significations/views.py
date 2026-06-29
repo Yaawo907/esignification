@@ -79,6 +79,15 @@ def envoyer_signification(request):
         from administration.models import ConfigurationPlateforme as _CP
         yousign_actif = _CP.get().yousign_active
 
+        if yousign_actif:
+            from notifications.sms import normaliser_telephone_yousign
+            try:
+                normaliser_telephone_yousign(huissier.telephone)
+            except ValueError as exc:
+                from django.contrib import messages
+                messages.error(request, str(exc))
+                return redirect(request.path)
+
         # Statut initial : si Yousign actif, l'acte attend la signature de l'huissier
         statut_initial = (Signification.STATUT_ATTENTE_SIGNATURE if yousign_actif
                          else Signification.STATUT_EN_ATTENTE)
@@ -101,18 +110,22 @@ def envoyer_signification(request):
         if yousign_actif:
             # ── FLUX YOUSIGN ──
             # L'acte n'est PAS encore envoyé au justiciable.
-            # Yousign envoie un OTP à l'huissier pour signer l'acte.
+            # Yousign envoie un lien par email ; l'OTP SMS autorise la signature.
             # Dès que l'huissier signe, le webhook déclenche l'envoi au justiciable.
-            yousign_ok = _lancer_yousign_si_actif(sig, contenu)
+            yousign_ok, yousign_err = _lancer_yousign_si_actif(sig, contenu)
             if yousign_ok:
                 journaliser(request.user, 'signification_attente_signature_yousign',
                             'Signification', sig.uuid, request=request)
                 messages.success(
                     request,
                     f"Acte {sig.reference} préparé. Vérifiez votre email : Yousign vous a envoyé "
-                    f"un lien pour signer électroniquement. L'acte sera transmis au justiciable "
-                    f"dès votre signature."
+                    f"un lien pour signer. Un code OTP vous sera transmis par SMS au moment "
+                    f"de la signature. L'acte sera transmis au justiciable dès votre signature."
                 )
+            elif yousign_err:
+                sig.delete()
+                messages.error(request, yousign_err)
+                return redirect(request.path)
             else:
                 # Échec Yousign : fallback envoi direct
                 sig.statut = Signification.STATUT_EN_ATTENTE
@@ -282,6 +295,13 @@ def _generer_pdf_certificat(signification, certificat):
     c.drawCentredString(w / 2, h - HEADER_H - 40, "CERTIFICAT DE SIGNIFICATION ELECTRONIQUE")
 
     # ── Corps : tableau de données ───────────────────────────────────────────
+    from django.utils import timezone as tz_util
+    date_rec = certificat.date_reception
+    if tz_util.is_aware(date_rec):
+        date_rec = tz_util.localtime(date_rec)
+    date_reception_fmt = date_rec.strftime('%d/%m/%Y à %Hh%Mm%Ss')
+    tz_label = certificat.timezone_reception or 'Africa/Porto-Novo'
+
     y = h - HEADER_H - 75
     c.setFont("Helvetica", 10)
     infos = [
@@ -290,9 +310,7 @@ def _generer_pdf_certificat(signification, certificat):
         ("Etude",            signification.huissier.nom_etude),
         ("Justiciable",      signification.justiciable.nom_complet),
         ("Email domicile",   signification.justiciable.email_domicile),
-        ("Date de reception", certificat.date_reception.strftime('%d/%m/%Y')),
-        ("Heure de reception", certificat.date_reception.strftime('%H:%M:%S UTC')),
-        ("Fuseau horaire",   certificat.timezone_reception),
+        ("Date et heure de reception", f"{date_reception_fmt} ({tz_label})"),
         ("Hash de l'acte",   signification.hash_acte[:40] + "..." if signification.hash_acte else "N/A"),
         ("Hash du certificat", certificat.hash_certificat[:40] + "..." if certificat.hash_certificat else "N/A"),
     ]
@@ -309,19 +327,32 @@ def _generer_pdf_certificat(signification, certificat):
         c.drawString(210, y + 3, str(valeur))
         y -= 22
 
+    # ── Attestation ──────────────────────────────────────────────────────────
+    y -= 8
+    c.setFillColorRGB(0.15, 0.15, 0.15)
+    c.setFont("Helvetica", 10)
+    attestation = (
+        "Ce certificat atteste que l'acte a ete remis electroniquement "
+        "a la date et heure indiquees ci-dessus."
+    )
+    c.drawString(40, y, attestation)
+    y -= 28  # espace avant la zone de signature
+
     # ── Base légale ──────────────────────────────────────────────────────────
     if config.article_loi_signification or config.decret_reference:
-        y -= 10
         c.setStrokeColorRGB(0.8, 0.8, 0.8)
         c.setLineWidth(0.5)
         c.line(40, y + 10, w - 40, y + 10)
+        y -= 6
         c.setFillColorRGB(0.35, 0.35, 0.35)
         c.setFont("Helvetica-Oblique", 8)
         if config.article_loi_signification:
-            c.drawString(40, y - 2, f"Base legale : {config.article_loi_signification[:110]}")
+            c.drawString(40, y, f"Base legale : {config.article_loi_signification[:110]}")
             y -= 14
         if config.decret_reference:
-            c.drawString(40, y - 2, f"Decret : {config.decret_reference[:120]}")
+            c.drawString(40, y, f"Decret : {config.decret_reference[:120]}")
+            y -= 14
+        y -= 10
 
     # ── Signature visuelle de l'huissier ────────────────────────────────────
     _PREFIXES_IMG = (
@@ -347,18 +378,27 @@ def _generer_pdf_certificat(signification, certificat):
             sig_img = ImageReader(sig_buf)
             sig_w, sig_h = 160, 55
             sig_x = w - 40 - sig_w
-            sig_y_base = y - 60 if y > 100 else 55
-            c.setStrokeColorRGB(0.10, 0.24, 0.43)
-            c.setLineWidth(0.8)
-            c.rect(sig_x - 4, sig_y_base - 4, sig_w + 8, sig_h + 22, stroke=1, fill=0)
+            pad = 6
+            frame_h = sig_h + pad * 2
+
+            # Label au-dessus du cadre
             c.setFillColorRGB(0.10, 0.24, 0.43)
             c.setFont("Helvetica-Bold", 7)
-            c.drawString(sig_x, sig_y_base + sig_h + 6, "Signature de l'huissier instrumentaire :")
-            c.drawImage(sig_img, sig_x, sig_y_base, width=sig_w, height=sig_h,
+            c.drawString(sig_x, y, "Signature de l'huissier instrumentaire :")
+            y -= 12
+
+            # Cadre puis image à l'intérieur
+            frame_y = y - frame_h
+            c.setStrokeColorRGB(0.10, 0.24, 0.43)
+            c.setLineWidth(0.8)
+            c.rect(sig_x - 4, frame_y, sig_w + 8, frame_h, stroke=1, fill=0)
+            c.drawImage(sig_img, sig_x, frame_y + pad, width=sig_w, height=sig_h,
                         preserveAspectRatio=True, mask='auto')
+
+            # Nom de l'huissier sous le cadre
             c.setFont("Helvetica-Oblique", 7)
             c.setFillColorRGB(0.3, 0.3, 0.3)
-            c.drawCentredString(sig_x + sig_w / 2, sig_y_base - 8,
+            c.drawCentredString(sig_x + sig_w / 2, frame_y - 10,
                                 f"Me {signification.huissier.prenom} {signification.huissier.nom}")
         except Exception:
             pass
@@ -413,6 +453,25 @@ def telecharger_acte(request, uuid):
     journaliser(user, 'acte_consulte', 'Signification', sig.uuid, request=request)
     response = HttpResponse(contenu, content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="{sig.nom_fichier_original}"'
+    return response
+
+
+@login_required
+def telecharger_preuve_yousign(request, uuid):
+    """Télécharge le dossier de preuve Yousign (audit trail) — huissier/clerc uniquement."""
+    user = request.user
+    if not _require_huissier(user):
+        raise Http404
+    from accounts.models import User as _User
+    huissier = (user.profil_huissier if user.role == _User.HUISSIER
+                else user.profil_clerc.huissier)
+    sig = get_object_or_404(Signification, uuid=uuid, huissier=huissier)
+    if not sig.yousign_audit_trail_chiffre:
+        raise Http404
+    contenu = dechiffrer_fichier(bytes(sig.yousign_audit_trail_chiffre))
+    journaliser(user, 'preuve_yousign_telechargee', 'Signification', sig.uuid, request=request)
+    response = HttpResponse(contenu, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="preuve_yousign_{sig.reference}.pdf"'
     return response
 
 
@@ -551,10 +610,63 @@ def _envoyer_au_justiciable(sig, justiciable):
     notif_sig(justiciable, sig, token_accepter, token_refuser)
 
 
-def _lancer_yousign_si_actif(signification, pdf_bytes) -> bool:
+def finaliser_yousign_et_envoyer_justiciable(sig, sig_req_id=None):
+    """
+    Télécharge le PDF signé, met à jour la signification et notifie le justiciable.
+    Appelé par le webhook Yousign ou par synchronisation manuelle (dev local).
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    sig_req_id = sig_req_id or sig.yousign_signature_request_id
+    if not sig_req_id:
+        raise ValueError("Aucune demande Yousign associée à cette signification.")
+
+    if sig.yousign_statut == 'done' and sig.statut == Signification.STATUT_EN_ATTENTE:
+        logger.info("Yousign : %s déjà finalisée, envoi justiciable uniquement.", sig.reference)
+        _envoyer_au_justiciable(sig, sig.justiciable)
+        return
+
+    try:
+        from .yousign_service import telecharger_document_signe, telecharger_audit_trail
+        pdf_signe = telecharger_document_signe(sig_req_id)
+        sig.fichier_chiffre = chiffrer_fichier(pdf_signe)
+        audit_trail_pdf = None
+        try:
+            audit_trail_pdf = telecharger_audit_trail(sig_req_id, sig.yousign_signer_id or None)
+            sig.yousign_audit_trail_chiffre = chiffrer_fichier(audit_trail_pdf)
+            if not sig.yousign_signer_id:
+                from .yousign_service import recuperer_signataire_id
+                sig.yousign_signer_id = recuperer_signataire_id(sig_req_id)
+        except Exception as e:
+            logger.warning("Yousign : audit trail non recupere pour %s — %s", sig.reference, e)
+    except Exception as e:
+        logger.error("Yousign : PDF signé non récupéré pour %s — %s", sig.reference, e)
+        raise
+
+    sig.yousign_statut = 'done'
+    sig.statut = Signification.STATUT_EN_ATTENTE
+    update_fields = ['yousign_statut', 'statut', 'fichier_chiffre']
+    if sig.yousign_audit_trail_chiffre:
+        update_fields.append('yousign_audit_trail_chiffre')
+    if sig.yousign_signer_id:
+        update_fields.append('yousign_signer_id')
+    sig.save(update_fields=update_fields)
+
+    journaliser(None, 'yousign_signature_done', 'Signification', sig.uuid,
+                description=f"Signature Yousign complete : {sig_req_id}")
+
+    from notifications.service import envoyer_preuve_yousign_huissier
+    envoyer_preuve_yousign_huissier(sig, pdf_signe, audit_trail_pdf)
+    _envoyer_au_justiciable(sig, sig.justiciable)
+    journaliser(None, 'signification_envoyee_apres_signature', 'Signification', sig.uuid,
+                description="Acte transmis au justiciable après signature Yousign")
+
+
+def _lancer_yousign_si_actif(signification, pdf_bytes) -> tuple[bool, str]:
     """
     Lance la demande de signature Yousign pour l'huissier.
-    Retourne True si la demande a été créée avec succès, False sinon.
+    Retourne (True, '') si succès, (False, message) si erreur bloquante,
+    (False, '') si échec technique (fallback possible).
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -563,10 +675,18 @@ def _lancer_yousign_si_actif(signification, pdf_bytes) -> bool:
         sig_req_id = creer_demande_signature(signification, pdf_bytes)
         journaliser(None, 'yousign_demande_creee', 'Signification', signification.uuid,
                     description=f"Signature request Yousign : {sig_req_id}")
-        return True
+        return True, ''
+    except ValueError as e:
+        logger.error("Yousign : numero invalide pour %s — %s", signification.reference, e)
+        return False, str(e)
     except Exception as e:
+        err = str(e)
         logger.error("Yousign : echec pour %s — %s", signification.reference, e)
-        return False
+        from .yousign_service import message_erreur_yousign_api
+        msg = message_erreur_yousign_api(err)
+        if msg:
+            return False, msg
+        return False, ''
 
 
 # ─────────────────────────────────────────────────────────────
@@ -616,29 +736,10 @@ def webhook_yousign(request):
         return HttpResponse(status=200)
 
     if event_name == 'signature_request.done':
-        # 1. Télécharger le PDF signé et le stocker (remplace l'original)
         try:
-            from .yousign_service import telecharger_document_signe
-            pdf_signe = telecharger_document_signe(sig_req_id)
-            sig.fichier_chiffre = chiffrer_fichier(pdf_signe)
+            finaliser_yousign_et_envoyer_justiciable(sig, sig_req_id)
         except Exception as e:
-            logger.error("Webhook Yousign : PDF signe non recupere — %s", e)
-
-        # 2. Passer le statut en attente (prêt à être reçu par le justiciable)
-        sig.yousign_statut = 'done'
-        sig.statut = Signification.STATUT_EN_ATTENTE
-        sig.save(update_fields=['yousign_statut', 'statut', 'fichier_chiffre'])
-
-        journaliser(None, 'yousign_signature_done', 'Signification', sig.uuid,
-                    description=f"Signature Yousign complete : {sig_req_id}")
-
-        # 3. Envoyer maintenant l'acte signé au justiciable
-        try:
-            _envoyer_au_justiciable(sig, sig.justiciable)
-            journaliser(None, 'signification_envoyee_apres_signature', 'Signification', sig.uuid,
-                        description="Acte transmis au justiciable après signature Yousign")
-        except Exception as e:
-            logger.error("Webhook Yousign : erreur envoi justiciable — %s", e)
+            logger.error("Webhook Yousign : erreur finalisation — %s", e)
 
     elif event_name in ('signature_request.expired', 'signature_request.canceled',
                         'signature_request.rejected'):

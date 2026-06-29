@@ -1,0 +1,75 @@
+{% load static %}
+<aside class="sidebar sidebar-huissier">
+  <div class="sidebar-logo">
+    {% include 'base/_logo_sm.html' %}
+    <div>
+      <div class="logo-name">e-Signification</div>
+      <div class="logo-sub">Espace huissier</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Principal</div>
+    <a href="{% url 'huissiers:tableau_de_bord' %}"
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'tableau_de_bord' %}active{% endif %}">
+      <span class="nav-icon">▦</span> Tableau de bord
+    </a>
+    <a href="{% url 'huissiers:significations' %}"
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'significations' %}active{% endif %}">
+      <span class="nav-icon">✉</span> Significations
+      {% if stats_en_attente %}<span class="nav-badge">{{ stats_en_attente }}</span>{% endif %}
+    </a>
+    <a href="{% url 'huissiers:rechercher' %}"
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'rechercher' %}active{% endif %}">
+      <span class="nav-icon">⌕</span> Rechercher
+    </a>
+    <a href="{% url 'huissiers:inviter' %}"
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'inviter' %}active{% endif %}">
+      <span class="nav-icon">+</span> Inviter
+    </a>
+    <div class="nav-section" style="margin-top:10px;">Étude</div>
+    <a href="{% url 'huissiers:liste_clercs' %}"
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'liste_clercs' %}active{% endif %}">
+      <span class="nav-icon">👥</span> Mes clercs
+    </a>
+    <a href="{% url 'huissiers:liste_demandes_modification' %}"
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'liste_demandes_modification' or request.resolver_match.url_name == 'traiter_demande_modification' %}active{% endif %}">
+      <span class="nav-icon">✏</span> Demandes modif.
+      {% if nb_demandes_modif %}<span class="nav-badge">{{ nb_demandes_modif }}</span>{% endif %}
+    </a>
+    <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link">
+      <span class="nav-icon">&#9993;</span> Messagerie
+      {% if nb_messages_non_lus %}<span class="nav-badge">{{ nb_messages_non_lus }}</span>{% endif %}
+    </a>
+    {% if request.user.role == 'huissier' %}
+    <div class="nav-section" style="margin-top:10px;">Paramètres</div>
+    <a href="{% url 'huissiers:profil' %}"
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'profil' %}active{% endif %}">
+      <span class="nav-icon">⚙</span> Mon profil
+    </a>
+    <a href="{% url 'huissiers:parametres_signatures' %}"
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'parametres_signatures' %}active{% endif %}">
+      <span class="nav-icon">🖊</span> Signatures &amp; Cachets
+    </a>
+    {% endif %}
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+    <div>
+      <div class="user-name">
+        {% if request.user.role == 'huissier' %}
+          Me {{ request.user.profil_huissier.prenom }} {{ request.user.profil_huissier.nom }}
+        {% else %}
+          {{ request.user.profil_clerc.prenom }} {{ request.user.profil_clerc.nom }}
+        {% endif %}
+      </div>
+      <div class="user-role">
+        {% if request.user.role == 'huissier' %}
+          {{ request.user.profil_huissier.nom_etude }}
+        {% else %}
+          Clerc — {{ request.user.profil_clerc.huissier.nom_etude }}
+        {% endif %}
+      </div>
+    </div>
+    <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+  </div>
+</aside>

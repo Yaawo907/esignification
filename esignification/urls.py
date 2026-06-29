@@ -5,6 +5,8 @@ from django.conf.urls.static import static
 from django.views.static import serve
 from django.views.i18n import set_language
 from django.shortcuts import redirect
+from administration.views import texte_legal_public
+from administration.models import TexteLegal
 
 
 def home(request):
@@ -22,6 +24,9 @@ def home(request):
 
 urlpatterns = [
     path('', home, name='home'),
+    path('cgu/', texte_legal_public, {'type_texte': TexteLegal.TYPE_CGU}, name='cgu'),
+    path('confidentialite/', texte_legal_public, {'type_texte': TexteLegal.TYPE_CONFIDENTIALITE}, name='confidentialite'),
+    path('mentions-legales/', texte_legal_public, {'type_texte': TexteLegal.TYPE_MENTIONS}, name='mentions_legales'),
     path('admin/', admin.site.urls),
     path('i18n/', include('django.conf.urls.i18n')),
     path('set-language/', set_language, name='set_language'),

@@ -26,7 +26,7 @@
       <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
       <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
       <div class="nav-section" style="margin-top:10px;">Communication</div>
-      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">&#9993; Messagerie</a>#9993; Messagerie</a>
+      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">&#9993; Messagerie</a>
     </nav>
     <div class="sidebar-user sidebar-user-dark">
       <div class="user-avatar">A</div>
@@ -85,7 +85,7 @@
       {% if total_attente and not statut_filtre %}
       <div class="alert-banner" style="margin-bottom:16px;">
         <span>⚠</span>
-        <span><strong>{{ total_attente }}</strong> huissier{% if total_attente != 1 %}s{% endif %} en attente d'activation.</span>
+        <span><strong>{{ total_attente }}</strong> invitation{% if total_attente != 1 %}s{% endif %} en attente d'activation.</span>
         <a href="?statut=en_attente" class="btn btn-sm btn-orange">Voir →</a>
       </div>
       {% endif %}
@@ -121,6 +121,44 @@
               </tr>
             </thead>
             <tbody id="tbody-huissiers">
+              {% for inv in invitations %}
+              <tr id="row-inv-{{ inv.uuid }}" data-search="{{ inv.email|lower }} invitation">
+                <td>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="user-avatar" style="background:var(--orange); color:#fff; font-size:13px; flex-shrink:0;">?</div>
+                    <div>
+                      <div class="td-name" style="color:var(--text-light); font-style:italic;">Profil non complété</div>
+                      <div class="td-sub">{{ inv.email }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>—</td>
+                <td>—</td>
+                <td>—</td>
+                <td>
+                  <span class="badge badge-en_attente">Invitation envoyée</span>
+                </td>
+                <td>{{ inv.date_creation|date:"d/m/Y" }}</td>
+                <td style="text-align:right;">
+                  <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
+                    <button class="btn btn-sm btn-blue btn-renvoyer"
+                      data-url="{% url 'administration:renvoyer_invitation_token' inv.uuid %}"
+                      data-uuid="inv-{{ inv.uuid }}"
+                      data-email="{{ inv.email }}"
+                      title="Renvoyer l'email d'activation">
+                      ✉ Renvoyer
+                    </button>
+                    <button class="btn btn-sm btn-red btn-supprimer-invitation"
+                      data-url="{% url 'administration:supprimer_invitation' inv.uuid %}"
+                      data-uuid="inv-{{ inv.uuid }}"
+                      data-email="{{ inv.email }}"
+                      title="Supprimer cette invitation">
+                      🗑
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
               {% for h in huissiers %}
               <tr id="row-{{ h.uuid }}" data-search="{{ h.nom|lower }} {{ h.prenom|lower }} {{ h.user.email|lower }} {{ h.nom_etude|lower }} {{ h.ifu|lower }} {{ h.npi|lower }}">
                 <td>
@@ -182,6 +220,7 @@
                 </td>
               </tr>
               {% empty %}
+              {% if not invitations %}
               <tr id="empty-row">
                 <td colspan="7" class="td-empty">
                   {% if statut_filtre %}
@@ -193,6 +232,7 @@
                   {% endif %}
                 </td>
               </tr>
+              {% endif %}
               {% endfor %}
             </tbody>
           </table>
@@ -275,10 +315,11 @@ document.addEventListener('click', function(e) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'statut=' + encodeURIComponent(statut),
   })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
+  .then(parseFetchResponse)
+  .then(function(result) {
     if (row) row.classList.remove('row-loading');
-    if (!data.success) {
+    var data = result.data;
+    if (!result.ok || !data.success) {
       showToast('Erreur : ' + (data.error || 'Statut invalide.'), 'error');
       btn.disabled = false;
       return;
@@ -325,12 +366,16 @@ document.addEventListener('click', function(e) {
   btn.disabled = true;
 
   fetchSecure(url, { method: 'POST' })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
+  .then(parseFetchResponse)
+  .then(function(result) {
     if (row) row.classList.remove('row-loading');
     btn.disabled = false;
-    if (data.success) {
+    var data = result.data;
+    if (result.ok && data.success) {
       showToast(data.message, 'success');
+      if (data.reload) {
+        setTimeout(function() { window.location.reload(); }, 700);
+      }
     } else {
       showToast('Erreur : ' + (data.error || 'Impossible de renvoyer.'), 'error');
     }
@@ -338,7 +383,49 @@ document.addEventListener('click', function(e) {
   .catch(function() {
     if (row) row.classList.remove('row-loading');
     btn.disabled = false;
-    showToast('Erreur réseau. Veuillez réessayer.', 'error');
+    showToast('Erreur réseau. Vérifiez votre connexion.', 'error');
+  });
+});
+
+
+/* ── Supprimer invitation AJAX ── */
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-supprimer-invitation');
+  if (!btn) return;
+
+  const url = btn.dataset.url;
+  const uuid = btn.dataset.uuid;
+  const email = btn.dataset.email || '';
+  const row = document.getElementById('row-' + uuid);
+
+  if (!confirm('Supprimer l\'invitation pour ' + email + ' ?\nLe lien d\'activation ne sera plus utilisable.')) {
+    return;
+  }
+
+  if (row) row.classList.add('row-loading');
+  btn.disabled = true;
+
+  fetchSecure(url, { method: 'POST' })
+  .then(parseFetchResponse)
+  .then(function(result) {
+    if (row) row.classList.remove('row-loading');
+    var data = result.data;
+    if (result.ok && data.success) {
+      if (row) {
+        row.style.transition = 'opacity .3s';
+        row.style.opacity = '0';
+        setTimeout(function() { row.remove(); }, 300);
+      }
+      showToast(data.message, 'success');
+    } else {
+      btn.disabled = false;
+      showToast('Erreur : ' + (data.error || 'Impossible de supprimer.'), 'error');
+    }
+  })
+  .catch(function() {
+    if (row) row.classList.remove('row-loading');
+    btn.disabled = false;
+    showToast('Erreur réseau. Vérifiez votre connexion.', 'error');
   });
 });
 

@@ -5,35 +5,7 @@
 {% block body %}
 <div class="dashboard-layout">
 
-  <!-- ── Sidebar ── -->
-  <aside class="sidebar sidebar-huissier">
-    <div class="sidebar-logo">
-      {% include 'base/_logo_sm.html' %}
-      <div>
-        <div class="logo-name">e-Signification</div>
-        <div class="logo-sub">Espace huissier</div>
-      </div>
-    </div>
-    <nav class="sidebar-nav">
-      <div class="nav-section">Principal</div>
-      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link">▦ Tableau de bord</a>
-      <a href="{% url 'huissiers:significations' %}" class="nav-item active">✉ Significations</a>
-      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link">⌕ Rechercher</a>
-      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link">+ Inviter</a>
-      <div class="nav-section" style="margin-top:10px;">Étude</div>
-      <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item spinner-link"><span class="nav-icon">👥</span> Mes clercs</a>
-      <a href="{% url 'huissiers:liste_demandes_modification' %}" class="nav-item spinner-link"><span class="nav-icon">✏</span> Demandes modif.</a>
-      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link"><span class="nav-icon">&#9993;</span> Messagerie</a>
-    </nav>
-    <div class="sidebar-user">
-      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
-      <div>
-        <div class="user-name">{{ request.user.email }}</div>
-        <div class="user-role">Huissier</div>
-      </div>
-      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
-    </div>
-  </aside>
+  {% include 'huissiers/_sidebar.html' %}
 
   <!-- ── Contenu principal ── -->
   <main class="dashboard-main">
@@ -169,6 +141,15 @@
                     </a>
                     {% endif %}
 
+                    {% if sig.yousign_statut == 'done' and sig.yousign_audit_trail_chiffre %}
+                    <a href="{% url 'significations:telecharger_preuve_yousign' sig.uuid %}"
+                      target="_blank" rel="noopener"
+                      class="btn btn-xs btn-green spinner-link" data-loading="Téléchargement…"
+                      title="Dossier de preuve Yousign (audit trail)">
+                      🔐 Preuve
+                    </a>
+                    {% endif %}
+
                     {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
                       {% if sig.certificat %}
                       <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}"
@@ -253,6 +234,7 @@
     </div><!-- /content-area -->
   </main>
 </div>
+{% endblock %}
 
 {% block extra_scripts %}
 <script>
@@ -270,4 +252,11 @@
     rows.forEach(function(row) {
       const match = !q || row.dataset.search.includes(q);
       row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    if (noResult) noResult.style.display = visible === 0 ? 'block' : 'none';
+  });
+})();
+</script>
+{% endblock %}
  

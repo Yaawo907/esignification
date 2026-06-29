@@ -3,29 +3,7 @@
 {% block body_class %}dashboard-page{% endblock %}
 {% block body %}
 <div class="dashboard-layout">
-  <aside class="sidebar sidebar-admin">
-    <div class="sidebar-logo">
-      {% include 'base/_logo_sm.html' %}
-      <div><div class="logo-name">e-Signification</div><div class="logo-sub">Administration</div></div>
-    </div>
-    <nav class="sidebar-nav">
-      <div class="nav-section">Tableau de bord</div>
-      <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white active">▦ Vue d'ensemble</a>
-      <div class="nav-section">Utilisateurs</div>
-      <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link">✎ Huissiers</a>
-      <div class="nav-section">Paramétrage</div>
-      <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link">⚙ Configuration</a>
-      <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link">§ Textes légaux</a>
-      <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link">🔍 Audit</a>
-      <div class="nav-section" style="margin-top:10px;">Communication</div>
-      <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">&#9993; Messagerie</a>#9993; Messagerie</a>
-    </nav>
-    <div class="sidebar-user sidebar-user-dark">
-      <div class="user-avatar">A</div>
-      <div><div class="user-name" style="color:#fff;">Administrateur</div><div class="user-role">Super admin</div></div>
-      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white">⏻</a>
-    </div>
-  </aside>
+  {% include 'administration/_sidebar.html' %}
   <main class="dashboard-main">
     <header class="topbar">
       <button class="btn-hamburger" id="btn-hamburger" type="button" aria-label="Ouvrir le menu" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="2" rx="1"/><rect x="1" y="9" width="18" height="2" rx="1"/><rect x="1" y="15" width="18" height="2" rx="1"/></svg></button>

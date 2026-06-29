@@ -160,10 +160,14 @@
                   </div>
                 </td>
 
-                <!-- Date -->
+                <!-- Date de réception -->
                 <td>
-                  <div style="font-size:13px;">{{ sig.date_envoi|date:"d/m/Y" }}</div>
-                  <div class="td-sub">{{ sig.date_envoi|date:"H:i" }}</div>
+                  {% if sig.date_acceptation %}
+                  <div style="font-size:13px;">{{ sig.date_acceptation|date:"d/m/Y" }}</div>
+                  <div class="td-sub">{{ sig.date_acceptation|date:"H:i:s" }}</div>
+                  {% else %}
+                  <span style="font-size:12px; color:var(--text-light);">—</span>
+                  {% endif %}
                 </td>
 
                 <!-- Statut -->
@@ -230,8 +234,10 @@
                       {% if sig.certificat %}
                       <a href="{% url 'significations:telecharger_certificat' sig.certificat.uuid %}"
                         class="btn btn-xs btn-ghost spinner-link"
-                        data-loading="Téléchargement…"
-                        title="Télécharger le certificat de réception">
+                        data-loading="Ouverture…"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Consulter le certificat de réception">
                         🏅 Certificat
                       </a>
                       {% endif %}

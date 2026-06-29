@@ -205,7 +205,7 @@
 
             <div class="info-box" style="margin-bottom:16px;background:#fef9ec;border-color:#e9c46a;">
               ⚡ Token API unique géré par l'administrateur. Les huissiers reçoivent un lien de
-              signature par email (OTP) à chaque envoi d'acte.
+              signature par email ; Yousign envoie un code OTP par SMS pour autoriser la signature.
             </div>
 
             <div class="form-row">
@@ -216,6 +216,10 @@
                   <option value="production" {% if config.yousign_mode == 'production' %}selected{% endif %}>🚀 Production</option>
                 </select>
                 <div class="form-hint">Utilisez Sandbox pour valider avant de passer en prod.</div>
+                <div class="form-hint" style="margin-top:6px;color:#8a6d3b;">
+                  Sandbox : l'email de chaque huissier testeur doit être celui d'un compte
+                  de votre organisation Yousign (sinon l'activation de la signature échoue).
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Clé API Yousign</label>
@@ -232,8 +236,17 @@
                      placeholder="{% if config.yousign_webhook_secret_chiffre %}●●●●●●●● (configuré){% else %}Secret HMAC fourni par Yousign{% endif %}"
                      autocomplete="off">
               <div class="form-hint">
-                URL webhook à configurer dans Yousign :
-                <code>https://votre-domaine.com/significations/webhook/yousign/</code>
+                <strong>Ne pas coller l'URL ici.</strong> Copiez uniquement la clé secrète HMAC
+                affichée dans Yousign → Developers → Webhooks → votre abonnement → Secret key.
+              </div>
+              <div class="form-hint" style="margin-top:6px;">
+                URL webhook à configurer dans Yousign (champ « Endpoint ») :
+                <code>{{ request.scheme }}://{{ request.get_host }}/significations/webhook/yousign/</code>
+              </div>
+              <div class="form-hint" style="margin-top:6px;color:#8a6d3b;">
+                En local (<code>127.0.0.1</code>), Yousign ne peut pas appeler cette URL.
+                Utilisez <strong>ngrok</strong> (URL publique HTTPS) ou lancez
+                <code>python manage.py yousign_sync</code> après chaque signature test.
               </div>
             </div>
 

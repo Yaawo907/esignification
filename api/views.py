@@ -1,8 +1,16 @@
+import logging
+import re
+
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from django.utils.html import escape
 from accounts.models import User
+from api.sms_auth import verifier_cle_sms_api
+from notifications.sms import _normaliser_telephone
+from notifications.sms_gateway import expedier_sms
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
@@ -141,3 +149,40 @@ def tester_yousign_ajax(request):
         return Response({'success': False, 'message': 'Erreur HTTP ' + str(e.code) + '.'})
     except Exception as e:
         return Response({'success': False, 'message': 'Erreur reseau : ' + str(e)})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def envoyer_sms_v1(request):
+    """
+    Passerelle SMS interne — appelée par notifications.sms quand SMS_BACKEND=custom.
+    Corps JSON : {"to": "+229...", "message": "...", "sender": "eSignification"}
+    Auth : Authorization: Bearer <SMS_API_KEY>
+    """
+    if not verifier_cle_sms_api(request):
+        return Response({'success': False, 'error': 'Clé API invalide ou absente.'}, status=401)
+
+    data = request.data if isinstance(request.data, dict) else {}
+    numero = _normaliser_telephone(str(data.get('to', '')).strip())
+    message = str(data.get('message', '')).strip()
+    sender = str(data.get('sender', '')).strip()
+
+    if not numero:
+        return Response({'success': False, 'error': 'Champ « to » invalide ou manquant.'}, status=400)
+    if not message:
+        return Response({'success': False, 'error': 'Champ « message » manquant.'}, status=400)
+    if len(message) > 1600:
+        return Response({'success': False, 'error': 'Message trop long (max 1600 caractères).'}, status=400)
+    if sender and not re.match(r'^[\w\s\-\.]{1,50}$', sender):
+        return Response({'success': False, 'error': 'Expéditeur invalide.'}, status=400)
+
+    try:
+        expedier_sms(numero, message, sender)
+    except ValueError as exc:
+        logger.warning("Échec envoi SMS API vers %s : %s", numero, exc)
+        return Response({'success': False, 'error': str(exc)}, status=502)
+    except Exception as exc:
+        logger.exception("Erreur inattendue envoi SMS API vers %s", numero)
+        return Response({'success': False, 'error': 'Erreur interne lors de l\'envoi.'}, status=500)
+
+    return Response({'success': True, 'to': numero})

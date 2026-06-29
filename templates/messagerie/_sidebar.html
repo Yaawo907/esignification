@@ -4,7 +4,8 @@
     <div><div class="logo-name">e-Signification</div><div class="logo-sub">Messagerie</div></div>
   </div>
   <nav class="sidebar-nav">
-    <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link">&#9993; Conversations</a>
+    <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item spinner-link {% if request.resolver_match.url_name == 'liste_conversations' and request.GET.vue != 'archives' %}active{% endif %}">&#9993; Boîte de réception</a>
+    <a href="{% url 'messagerie:liste_conversations' %}?vue=archives" class="nav-item spinner-link {% if request.GET.vue == 'archives' %}active{% endif %}">&#128230; Archivées</a>
     <a href="{% url 'messagerie:nouvelle_conversation' %}" class="nav-item spinner-link">+ Nouveau message</a>
     <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.15);padding-top:12px;">
       {% if request.user.role == 'huissier' or request.user.role == 'clerc' %}

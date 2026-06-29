@@ -82,22 +82,23 @@ def liste_significations(request):
 def profil(request):
     from django.contrib import messages
     from accounts.forms import ModificationMotDePasseForm
+    from accounts.mfa_profil import contexte_mfa_profil, traiter_action_mfa_profil
 
     profil = request.user.profil_justiciable
-    form_mdp = ModificationMotDePasseForm(user=request.user)
+    user = request.user
+    form_mdp = ModificationMotDePasseForm(user=user)
     erreur_email = None
     succes_email = False
 
-    # ── Changement de mot de passe ──
     if request.method == 'POST' and 'action' in request.POST:
         action = request.POST.get('action')
 
         if action == 'changer_mdp':
-            form_mdp = ModificationMotDePasseForm(user=request.user, data=request.POST)
+            form_mdp = ModificationMotDePasseForm(user=user, data=request.POST)
             if form_mdp.is_valid():
-                request.user.set_password(form_mdp.cleaned_data['nouveau_mdp'])
-                request.user.save()
-                journaliser(request.user, 'modification_mot_de_passe', request=request)
+                user.set_password(form_mdp.cleaned_data['nouveau_mdp'])
+                user.save()
+                journaliser(user, 'modification_mot_de_passe', request=request)
                 messages.success(request, "Mot de passe modifié. Reconnectez-vous.")
                 from django.contrib.auth import logout
                 logout(request)
@@ -107,24 +108,32 @@ def profil(request):
             nouveau_email = escape(request.POST.get('nouveau_email', '').strip().lower())
             if not nouveau_email:
                 erreur_email = "L'adresse email est obligatoire."
-            elif nouveau_email == request.user.email.lower():
+            elif nouveau_email == user.email.lower():
                 erreur_email = "C'est déjà votre adresse email actuelle."
             else:
                 from accounts.models import User as U
-                if U.objects.filter(email=nouveau_email).exclude(pk=request.user.pk).exists():
+                if U.objects.filter(email=nouveau_email).exclude(pk=user.pk).exists():
                     erreur_email = "Cette adresse email est déjà associée à un compte."
                 else:
-                    # Envoyer lien de confirmation au NOUVEAU email
-                    _envoyer_confirmation_changement_email(request.user, nouveau_email)
-                    journaliser(request.user, 'demande_changement_email_domicile',
+                    _envoyer_confirmation_changement_email(user, nouveau_email)
+                    journaliser(user, 'demande_changement_email_domicile',
                                 description=f"Nouveau email : {nouveau_email}", request=request)
                     succes_email = True
+        else:
+            mfa_redirect = traiter_action_mfa_profil(
+                request, user, 'justiciables:profil', telephone=profil.telephone,
+            )
+            if mfa_redirect:
+                return mfa_redirect
+
+    user.refresh_from_db(fields=['mfa_methode', 'totp_secret'])
 
     return render(request, 'justiciables/profil.html', {
         'profil': profil,
         'form_mdp': form_mdp,
         'erreur_email': erreur_email,
         'succes_email': succes_email,
+        **contexte_mfa_profil(user, request.session),
     })
 
 

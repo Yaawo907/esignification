@@ -1,0 +1,33 @@
+{% with current=request.resolver_match.url_name %}
+<aside class="sidebar sidebar-admin">
+  <div class="sidebar-logo">
+    {% include 'base/_logo_sm.html' %}
+    <div>
+      <div class="logo-name">e-Signification</div>
+      <div class="logo-sub">Administration</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Tableau de bord</div>
+    <a href="{% url 'administration:tableau_de_bord' %}" class="nav-item nav-item-white spinner-link{% if current == 'tableau_de_bord' %} active{% endif %}">▦ Vue d'ensemble</a>
+    <div class="nav-section">Utilisateurs</div>
+    <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link{% if current == 'liste_huissiers' or current == 'creer_huissier' %} active{% endif %}">✎ Huissiers</a>
+    <div class="nav-section">Paramétrage</div>
+    <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link{% if current == 'configuration' %} active{% endif %}">⚙ Configuration</a>
+    <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link{% if current == 'textes_legaux' %} active{% endif %}">§ Textes légaux</a>
+    <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link{% if current == 'audit' %} active{% endif %}">🔍 Audit</a>
+    <div class="nav-section" style="margin-top:10px;">Mon compte</div>
+    <a href="{% url 'administration:profil' %}" class="nav-item nav-item-white spinner-link{% if current == 'profil' %} active{% endif %}">👤 Sécurité &amp; connexion</a>
+    <div class="nav-section">Communication</div>
+    <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">✉ Messagerie</a>
+  </nav>
+  <div class="sidebar-user sidebar-user-dark">
+    <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+    <div>
+      <div class="user-name" style="color:#fff;">{{ request.user.email }}</div>
+      <div class="user-role">Administrateur</div>
+    </div>
+    <a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white" title="Déconnexion">⏻</a>
+  </div>
+</aside>
+{% endwith %}

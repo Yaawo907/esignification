@@ -4,6 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token }}">
 <title>{% block title %}{{ config.nom_plateforme|default:"e-Signification" }}{% endblock %}</title>
 {% if config.logo_chambre %}
 <link rel="icon" type="image/png" href="{{ config.logo_chambre.url }}">
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 {% endif %}
 {% block body %}{% endblock %}
-<script src="{% static 'js/main.js' %}?v=3"></script>
+<script src="{% static 'js/main.js' %}?v=6"></script>
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>

@@ -14,5 +14,6 @@ urlpatterns = [
     path('clercs/<uuid:uuid>/desactiver/', views.desactiver_clerc, name='desactiver_clerc'),
     path('demandes-modification/', views.liste_demandes_modification, name='liste_demandes_modification'),
     path('demandes-modification/<uuid:uuid>/', views.traiter_demande_modification, name='traiter_demande_modification'),
+    path('profil/', views.profil_huissier, name='profil'),
     path('parametres/signatures/', views.parametres_signatures, name='parametres_signatures'),
 ]

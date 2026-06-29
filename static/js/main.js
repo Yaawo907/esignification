@@ -18,6 +18,15 @@ function getCookie(name) {
   return value;
 }
 
+/** Token CSRF — meta (HttpOnly cookie) puis input hidden puis cookie. */
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta && meta.content) return meta.content;
+  const input = document.querySelector('[name=csrfmiddlewaretoken]');
+  if (input && input.value) return input.value;
+  return getCookie('csrftoken') || '';
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -61,6 +70,12 @@ document.addEventListener('DOMContentLoaded', function() {
   /* ── Spinner sur boutons de formulaire (btn-spinner) ── */
   document.querySelectorAll('form').forEach(function(form) {
     form.addEventListener('submit', function() {
+      const pageMsg = form.getAttribute('data-page-spinner');
+      if (pageMsg) {
+        showSpinner();
+        const st = document.querySelector('#spinner-global .spinner-text');
+        if (st) st.textContent = pageMsg;
+      }
       const btn = form.querySelector('.btn-spinner');
       if (btn && !btn.disabled) {
         const loadingText = btn.getAttribute('data-loading') || 'Chargement…';
@@ -70,6 +85,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (loaderEl) {
           loaderEl.style.display = 'inline-flex';
           loaderEl.innerHTML = '<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></path></svg> ' + escapeHtml(loadingText);
+        } else if (!textEl) {
+          btn.dataset.originalHtml = btn.innerHTML;
+          btn.innerHTML = '<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></path></svg> ' + escapeHtml(loadingText);
         }
         btn.disabled = true;
       }
@@ -231,7 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function fetchSecure(url, options) {
   const defaults = {
     headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
+      'X-CSRFToken': getCsrfToken(),
       'X-Requested-With': 'XMLHttpRequest',
     },
     credentials: 'same-origin',
@@ -241,6 +259,24 @@ function fetchSecure(url, options) {
     merged.headers = Object.assign({}, defaults.headers, options.headers);
   }
   return fetch(url, merged);
+}
+
+/** Parse une réponse fetch — JSON ou message d'erreur lisible. */
+function parseFetchResponse(response) {
+  var ct = response.headers.get('Content-Type') || '';
+  if (ct.indexOf('application/json') !== -1) {
+    return response.json().then(function(data) {
+      return { ok: response.ok, status: response.status, data: data };
+    });
+  }
+  return Promise.resolve({
+    ok: false,
+    status: response.status,
+    data: {
+      success: false,
+      error: 'Réponse inattendue du serveur (HTTP ' + response.status + '). Actualisez la page.',
+    },
+  });
 }
 
 /* ── Focus trap accessibilité ── */
@@ -344,7 +380,9 @@ function buildSearchItem(uuid, nom, email, npi, ifu, onSelect) {
 
 /* ── Export pour usage inline dans les templates ── */
 window.fetchSecure = fetchSecure;
+window.parseFetchResponse = parseFetchResponse;
 window.escapeHtml = escapeHtml;
 window.getCookie = getCookie;
+window.getCsrfToken = getCsrfToken;
 window.showSpinner = showSpinner;
 window.hideSpinner = hideSpinner;

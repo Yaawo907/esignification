@@ -1,0 +1,202 @@
+{% extends 'base/base.html' %}
+{% block title %}Mon profil — Espace huissier{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+  {% include 'huissiers/_sidebar.html' %}
+
+  <main class="dashboard-main">
+    <header class="topbar">
+      <button class="btn-hamburger" id="btn-hamburger" type="button" aria-label="Ouvrir le menu" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="2" rx="1"/><rect x="1" y="9" width="18" height="2" rx="1"/><rect x="1" y="15" width="18" height="2" rx="1"/></svg></button>
+      <div>
+        <h1 class="topbar-title">Mon profil</h1>
+        <p class="topbar-sub">Informations professionnelles et sécurité du compte</p>
+      </div>
+    </header>
+
+    <div class="content-area" style="max-width:720px;">
+
+      {% if messages %}
+      {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }}" role="alert" style="margin-bottom:16px;">
+        {{ msg }}
+        <button class="alert-close" type="button" onclick="this.parentElement.remove()">×</button>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      <!-- Compte de connexion -->
+      <div class="card" style="margin-bottom:20px; padding:20px 24px;">
+        <div class="card-section-title">Compte de connexion</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px 24px;">
+          <div>
+            <div class="field-label">Email de connexion</div>
+            <div style="font-size:14px; font-weight:500;">{{ request.user.email }}</div>
+          </div>
+          <div>
+            <div class="field-label">Statut</div>
+            <div><span class="badge badge-acceptee">{{ huissier.get_statut_display }}</span></div>
+          </div>
+        </div>
+        <p class="form-hint" style="margin-top:12px;">
+          Pour changer l'adresse email de connexion, contactez l'administrateur de la plateforme.
+        </p>
+      </div>
+
+      <!-- Profil professionnel -->
+      <div class="card" style="margin-bottom:20px; padding:20px 24px;">
+        <div class="card-section-title">Profil professionnel</div>
+
+        {% if form_profil.non_field_errors %}
+        <div class="form-error" role="alert">{{ form_profil.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="profil">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="{{ form_profil.prenom.id_for_label }}">Prénom *</label>
+              {{ form_profil.prenom }}
+              {% if form_profil.prenom.errors %}<p class="field-error">{{ form_profil.prenom.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="{{ form_profil.nom.id_for_label }}">Nom *</label>
+              {{ form_profil.nom }}
+              {% if form_profil.nom.errors %}<p class="field-error">{{ form_profil.nom.errors.0 }}</p>{% endif %}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="{{ form_profil.nom_etude.id_for_label }}">Nom de l'étude *</label>
+            {{ form_profil.nom_etude }}
+            {% if form_profil.nom_etude.errors %}<p class="field-error">{{ form_profil.nom_etude.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="{{ form_profil.ifu.id_for_label }}">Numéro IFU</label>
+              {{ form_profil.ifu }}
+              {% if form_profil.ifu.errors %}<p class="field-error">{{ form_profil.ifu.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="{{ form_profil.npi.id_for_label }}">Numéro NPI</label>
+              {{ form_profil.npi }}
+              {% if form_profil.npi.errors %}<p class="field-error">{{ form_profil.npi.errors.0 }}</p>{% endif %}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="{{ form_profil.telephone.id_for_label }}">Téléphone</label>
+            {{ form_profil.telephone }}
+            {% if form_profil.telephone.errors %}<p class="field-error">{{ form_profil.telephone.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="{{ form_profil.adresse.id_for_label }}">Adresse professionnelle</label>
+            {{ form_profil.adresse }}
+            {% if form_profil.adresse.errors %}<p class="field-error">{{ form_profil.adresse.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+            <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+              Enregistrer le profil
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {% include 'accounts/_mfa_parametres.html' %}
+
+      <!-- Mot de passe -->
+      <div class="card" style="padding:20px 24px;">
+        <div class="card-section-title">Changer le mot de passe</div>
+
+        {% if form_mdp.non_field_errors %}
+        <div class="form-error" role="alert">{{ form_mdp.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="changer_mdp">
+
+          <div class="form-group">
+            <label class="form-label" for="id_ancien_mdp">Mot de passe actuel *</label>
+            <input type="password" name="ancien_mdp" id="id_ancien_mdp"
+              class="form-input{% if form_mdp.ancien_mdp.errors %} input-error{% endif %}"
+              autocomplete="current-password">
+            {% if form_mdp.ancien_mdp.errors %}<p class="field-error">{{ form_mdp.ancien_mdp.errors.0 }}</p>{% endif %}
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="id_nouveau_mdp">Nouveau mot de passe *</label>
+              <input type="password" name="nouveau_mdp" id="id_nouveau_mdp"
+                class="form-input{% if form_mdp.nouveau_mdp.errors %} input-error{% endif %}"
+                autocomplete="new-password" aria-describedby="mdp-exigences">
+              {% if form_mdp.nouveau_mdp.errors %}<p class="field-error">{{ form_mdp.nouveau_mdp.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="id_confirmer_mdp">Confirmer *</label>
+              <input type="password" name="confirmer_mdp" id="id_confirmer_mdp"
+                class="form-input{% if form_mdp.confirmer_mdp.errors %} input-error{% endif %}"
+                autocomplete="new-password">
+              {% if form_mdp.confirmer_mdp.errors %}<p class="field-error">{{ form_mdp.confirmer_mdp.errors.0 }}</p>{% endif %}
+            </div>
+          </div>
+
+          {% include 'base/_exigences_mdp.html' %}
+
+          <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+            <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+              Changer le mot de passe
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+(function() {
+  var mdp = document.getElementById('id_nouveau_mdp');
+  var conf = document.getElementById('id_confirmer_mdp');
+  var ruleLength = document.getElementById('mdp-rule-length');
+  var ruleNumeric = document.getElementById('mdp-rule-numeric');
+  var ruleMatch = document.getElementById('mdp-rule-match');
+  if (!mdp || !ruleLength) return;
+  function setRule(el, state) {
+    if (!el) return;
+    el.classList.remove('ok', 'ko');
+    if (state === 'ok') el.classList.add('ok');
+    else if (state === 'ko') el.classList.add('ko');
+  }
+  function verifier() {
+    var val = mdp.value;
+    var confVal = conf ? conf.value : '';
+    var hasInput = val.length > 0;
+    setRule(ruleLength, !hasInput ? null : (val.length >= 10 ? 'ok' : 'ko'));
+    setRule(ruleNumeric, !hasInput ? null : (!/^\d+$/.test(val) ? 'ok' : 'ko'));
+    if (!confVal) setRule(ruleMatch, null);
+    else if (!val) setRule(ruleMatch, 'ko');
+    else setRule(ruleMatch, val === confVal ? 'ok' : 'ko');
+  }
+  mdp.addEventListener('input', verifier);
+  if (conf) conf.addEventListener('input', verifier);
+})();
+</script>
+<style>
+.card-section-title {
+  font-size: 12px; font-weight: 600; color: var(--text-light);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 16px;
+}
+.field-label { font-size: 11px; color: var(--text-light); margin-bottom: 2px; }
+</style>
+{% endblock %}

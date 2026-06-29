@@ -1,4 +1,3 @@
-import pyotp
 from datetime import timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout
@@ -11,6 +10,8 @@ from .models import User, TokenActivation
 from .forms import (ConnexionForm, MFACodeForm, InscriptionHuissierForm,
                     InscriptionJusticiableForm, ModificationMotDePasseForm,
                     RecuperationCompteForm, NouveauMotDePasseForm)
+from .mfa import envoyer_code_mfa, verifier_code_mfa, telephone_utilisateur
+from .mfa_profil import sms_mfa_disponible
 from securite.tokens import creer_token_activation, valider_token, marquer_token_utilise
 from securite.audit import journaliser
 from notifications.service import envoyer_recuperation_mdp
@@ -23,31 +24,35 @@ def connexion(request):
     form = ConnexionForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.cleaned_data['user']
+        user.refresh_from_db(fields=['mfa_methode', 'mfa_active', 'totp_secret'])
         # Stocker user en session pour MFA
         request.session['pre_auth_user_id'] = user.pk
         request.session['pre_auth_next'] = request.GET.get('next', '')
         # Envoyer code MFA si méthode email ou OTP
         if user.mfa_active and not user.is_superuser and user.mfa_methode in [User.MFA_EMAIL, User.MFA_OTP]:
-            _envoyer_code_mfa(user)
+            if not envoyer_code_mfa(user):
+                messages.error(request, "Impossible d'envoyer le code de vérification. Vérifiez votre profil.")
+                del request.session['pre_auth_user_id']
+                return redirect('accounts:connexion')
         journaliser(user, 'connexion_tentative', request=request)
         return redirect('accounts:mfa_verification')
     return render(request, 'accounts/connexion.html', {'form': form})
 
 
-def _envoyer_code_mfa(user):
-    from notifications.service import envoyer_email
-    code = get_random_string(6, '0123456789')
-    user.mfa_code = code
-    user.mfa_code_expiry = timezone.now() + timedelta(minutes=10)
-    user.save(update_fields=['mfa_code', 'mfa_code_expiry'])
-    corps = f"""
-    <div style="font-family:Arial,sans-serif;padding:24px;">
-      <h2 style="color:#1a3c6e;">Code de vérification</h2>
-      <p>Votre code de connexion est :</p>
-      <p style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#1a3c6e;">{code}</p>
-      <p style="color:#888;">Ce code expire dans 10 minutes.</p>
-    </div>"""
-    envoyer_email(user.email, "Code de vérification — e-Signification Bénin", corps)
+def _masquer_telephone(tel: str) -> str:
+    tel = (tel or '').strip()
+    if len(tel) < 4:
+        return tel
+    return tel[:3] + '***' + tel[-2:]
+
+
+def _masquer_email(email: str) -> str:
+    if '@' not in email:
+        return email
+    local, domain = email.split('@', 1)
+    if len(local) <= 2:
+        return f'{local[0]}***@{domain}'
+    return f'{local[0]}***{local[-1]}@{domain}'
 
 
 @require_http_methods(["GET", "POST"])
@@ -56,6 +61,7 @@ def mfa_verification(request):
     if not user_id:
         return redirect('accounts:connexion')
     user = get_object_or_404(User, pk=user_id)
+    user.refresh_from_db(fields=['mfa_methode', 'mfa_active', 'totp_secret', 'mfa_code', 'mfa_code_expiry'])
     # Bypass MFA pour les superusers
     if user.is_superuser or not user.mfa_active:
         user.is_active = True
@@ -66,33 +72,47 @@ def mfa_verification(request):
         journaliser(user, 'connexion_reussie', request=request)
         next_url = request.session.pop('pre_auth_next', '')
         return redirect(next_url or redirect_apres_connexion(user))
-    form = MFACodeForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        code = form.cleaned_data['code']
-        valide = False
-        if user.mfa_methode == User.MFA_TOTP:
-            totp = pyotp.TOTP(user.totp_secret)
-            valide = totp.verify(code)
-        else:
-            if (user.mfa_code == code and
-                    user.mfa_code_expiry and
-                    timezone.now() < user.mfa_code_expiry):
-                valide = True
-                user.mfa_code = ''
-                user.mfa_code_expiry = None
-                user.save(update_fields=['mfa_code', 'mfa_code_expiry'])
-        if valide:
-            user.is_active = True
-            user.derniere_connexion = timezone.now()
-            user.save(update_fields=['derniere_connexion'])
-            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-            del request.session['pre_auth_user_id']
-            journaliser(user, 'connexion_reussie', request=request)
-            next_url = request.session.pop('pre_auth_next', '')
-            return redirect(next_url or redirect_apres_connexion(user))
-        else:
+
+    if request.method == 'POST' and request.POST.get('action') == 'renvoyer':
+        if user.mfa_methode in [User.MFA_EMAIL, User.MFA_OTP]:
+            if envoyer_code_mfa(user):
+                messages.success(request, "Un nouveau code a été envoyé.")
+            else:
+                messages.error(request, "Impossible de renvoyer le code.")
+        return redirect('accounts:mfa_verification')
+
+    if request.method == 'POST' and request.POST.get('action') != 'renvoyer':
+        form = MFACodeForm(request.POST)
+        if form.is_valid():
+            code = form.cleaned_data['code']
+            if verifier_code_mfa(user, code):
+                user.is_active = True
+                user.derniere_connexion = timezone.now()
+                user.save(update_fields=['derniere_connexion'])
+                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+                del request.session['pre_auth_user_id']
+                journaliser(user, 'connexion_reussie', request=request)
+                next_url = request.session.pop('pre_auth_next', '')
+                return redirect(next_url or redirect_apres_connexion(user))
             messages.error(request, "Code incorrect ou expiré.")
-    return render(request, 'accounts/mfa_verification.html', {'form': form, 'methode': user.mfa_methode})
+    else:
+        form = MFACodeForm()
+
+    tel = telephone_utilisateur(user)
+    methode_affichage = user.mfa_methode
+    if user.mfa_methode == User.MFA_OTP and not sms_mfa_disponible():
+        methode_affichage = User.MFA_EMAIL
+    if methode_affichage == User.MFA_EMAIL:
+        destinataire_masque = _masquer_email(user.email)
+    elif methode_affichage == User.MFA_OTP:
+        destinataire_masque = _masquer_telephone(tel)
+    else:
+        destinataire_masque = ''
+    return render(request, 'accounts/mfa_verification.html', {
+        'form': form,
+        'methode': methode_affichage,
+        'destinataire_masque': destinataire_masque,
+    })
 
 
 def redirect_apres_connexion(user):
@@ -115,10 +135,19 @@ def deconnexion(request):
 
 @require_http_methods(["GET", "POST"])
 def inscription_huissier(request):
-    token_brut = request.GET.get('token', '')
+    token_brut = (request.POST.get('token') or request.GET.get('token', '')).strip()
     token_obj, erreur = valider_token(token_brut, TokenActivation.ACTIVATION_HUISSIER)
     if erreur:
         return render(request, 'accounts/token_invalide.html', {'erreur': erreur})
+
+    if User.objects.filter(email=token_obj.email).exists():
+        marquer_token_utilise(token_obj)
+        messages.info(
+            request,
+            "Votre compte est déjà activé. Connectez-vous avec votre email et mot de passe.",
+        )
+        return redirect('accounts:connexion')
+
     form = InscriptionHuissierForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         d = form.cleaned_data
@@ -142,11 +171,14 @@ def inscription_huissier(request):
         )
         marquer_token_utilise(token_obj)
         journaliser(user, 'inscription_huissier_complete', request=request)
-        # Connecter directement l'huissier après activation
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         messages.success(request, "Compte activé avec succès. Bienvenue !")
         return redirect('/huissier/')
-    return render(request, 'accounts/inscription_huissier.html', {'form': form, 'email': token_obj.email})
+    return render(request, 'accounts/inscription_huissier.html', {
+        'form': form,
+        'email': token_obj.email,
+        'token': token_brut,
+    })
 
 
 @require_http_methods(["GET", "POST"])

@@ -15,41 +15,54 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Nom / Raison sociale *</label>{{ form.nom }}
+          {% if form.nom.errors %}<p class="field-error">{{ form.nom.errors.0 }}</p>{% endif %}
         </div>
         <div class="form-group">
           <label class="form-label">Prénom</label>{{ form.prenom }}
+          {% if form.prenom.errors %}<p class="field-error">{{ form.prenom.errors.0 }}</p>{% endif %}
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Numéro IFU</label>{{ form.ifu }}
+          {% if form.ifu.errors %}<p class="field-error">{{ form.ifu.errors.0 }}</p>{% endif %}
         </div>
         <div class="form-group">
           <label class="form-label">Numéro NPI</label>{{ form.npi }}
+          {% if form.npi.errors %}<p class="field-error">{{ form.npi.errors.0 }}</p>{% endif %}
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Adresse *</label>{{ form.adresse }}
+        {% if form.adresse.errors %}<p class="field-error">{{ form.adresse.errors.0 }}</p>{% endif %}
       </div>
       <div class="form-group">
         <label class="form-label">Téléphone *</label>{{ form.telephone }}
+        {% if form.telephone.errors %}<p class="field-error">{{ form.telephone.errors.0 }}</p>{% endif %}
       </div>
       <div class="form-group">
         <label class="form-label">Email d'élection de domicile électronique *</label>
         {{ form.email_domicile }}
         <p class="form-hint">C'est à cette adresse que vous recevrez toutes vos significations.</p>
+        {% if form.email_domicile.errors %}<p class="field-error">{{ form.email_domicile.errors.0 }}</p>{% endif %}
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Mot de passe *</label>{{ form.mot_de_passe }}
+          <label class="form-label" for="{{ form.mot_de_passe.id_for_label }}">Mot de passe *</label>
+          {{ form.mot_de_passe }}
+          {% include 'base/_exigences_mdp.html' %}
+          {% if form.mot_de_passe.errors %}<p class="field-error">{{ form.mot_de_passe.errors.0 }}</p>{% endif %}
         </div>
         <div class="form-group">
-          <label class="form-label">Confirmer *</label>{{ form.confirmer_mdp }}
+          <label class="form-label" for="{{ form.confirmer_mdp.id_for_label }}">Confirmer *</label>
+          {{ form.confirmer_mdp }}
+          {% if form.confirmer_mdp.errors %}<p class="field-error">{{ form.confirmer_mdp.errors.0 }}</p>{% endif %}
         </div>
       </div>
       <div class="form-group form-check">
-        {{ form.accepter_cgu }} <label>J'accepte les <a href="/cgu/" target="_blank">CGU</a></label>
+        {{ form.accepter_cgu }} <label>J'accepte les <a href="{% url 'cgu' %}" target="_blank" rel="noopener noreferrer">CGU</a></label>
       </div>
+      {% if form.accepter_cgu.errors %}<p class="field-error">{{ form.accepter_cgu.errors.0 }}</p>{% endif %}
       <button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="Création…">
         <span class="btn-text">Créer mon compte</span>
         <span class="btn-loader" style="display:none;"><svg class="spin-icon" viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></path></svg></span>
@@ -57,4 +70,45 @@
     </form>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+(function() {
+  var mdp = document.getElementById('{{ form.mot_de_passe.id_for_label }}');
+  var conf = document.getElementById('{{ form.confirmer_mdp.id_for_label }}');
+  var ruleLength = document.getElementById('mdp-rule-length');
+  var ruleNumeric = document.getElementById('mdp-rule-numeric');
+  var ruleMatch = document.getElementById('mdp-rule-match');
+  if (!mdp || !ruleLength) return;
+
+  function setRule(el, state) {
+    if (!el) return;
+    el.classList.remove('ok', 'ko');
+    if (state === 'ok') el.classList.add('ok');
+    else if (state === 'ko') el.classList.add('ko');
+  }
+
+  function verifier() {
+    var val = mdp.value;
+    var confVal = conf ? conf.value : '';
+    var hasInput = val.length > 0;
+
+    setRule(ruleLength, !hasInput ? null : (val.length >= 10 ? 'ok' : 'ko'));
+    setRule(ruleNumeric, !hasInput ? null : (!/^\d+$/.test(val) ? 'ok' : 'ko'));
+
+    if (!confVal) {
+      setRule(ruleMatch, null);
+    } else if (!val) {
+      setRule(ruleMatch, 'ko');
+    } else {
+      setRule(ruleMatch, val === confVal ? 'ok' : 'ko');
+    }
+  }
+
+  mdp.addEventListener('input', verifier);
+  if (conf) conf.addEventListener('input', verifier);
+})();
+</script>
 {% endblock %}

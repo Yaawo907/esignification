@@ -1,0 +1,61 @@
+{% extends 'base/base.html' %}
+{% block title %}{{ titre_page }} — {{ config.nom_plateforme|default:"e-Signification" }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block extra_head %}
+<style>
+.legal-page { max-width: 820px; margin: 0 auto; padding: 32px 16px 48px; }
+.legal-card {
+  background: #fff;
+  border: 1px solid var(--border, #e2e5ee);
+  border-radius: 10px;
+  padding: 28px 32px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+.legal-header { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border, #e2e5ee); }
+.legal-title { font-size: 22px; font-weight: 700; color: #1a1a1a; margin: 0 0 6px; }
+.legal-meta { font-size: 12px; color: var(--text-light, #718096); }
+.legal-content { font-size: 14px; line-height: 1.75; color: #2d3748; }
+.legal-content h2, .legal-content h3 { margin: 1.4em 0 .6em; color: #1a3c6e; }
+.legal-content p { margin: 0 0 1em; }
+.legal-content ul, .legal-content ol { margin: 0 0 1em 1.4em; }
+.legal-empty { color: var(--text-secondary, #4a5568); font-style: italic; }
+.legal-nav { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+@media (max-width: 768px) {
+  .legal-card { padding: 20px 16px; }
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="legal-page">
+  <div class="legal-nav">
+    <a href="/" class="btn btn-ghost btn-sm spinner-link">← Accueil</a>
+    <a href="{% url 'cgu' %}" class="btn btn-ghost btn-sm {% if type_texte == 'cgu' %}btn-primary{% endif %}">CGU</a>
+    <a href="{% url 'confidentialite' %}" class="btn btn-ghost btn-sm {% if type_texte == 'confidentialite' %}btn-primary{% endif %}">Confidentialité</a>
+    <a href="{% url 'mentions_legales' %}" class="btn btn-ghost btn-sm {% if type_texte == 'mentions' %}btn-primary{% endif %}">Mentions légales</a>
+  </div>
+
+  <article class="legal-card">
+    <header class="legal-header">
+      <h1 class="legal-title">{{ titre_page }}</h1>
+      {% if texte %}
+      <div class="legal-meta">
+        Version {{ texte.version }}
+        — mise à jour le {{ texte.date_mise_a_jour|date:"d/m/Y" }}
+      </div>
+      {% endif %}
+    </header>
+
+    <div class="legal-content">
+      {% if texte and texte.contenu_html %}
+        {{ texte.contenu_html|safe }}
+      {% else %}
+        <p class="legal-empty">
+          Ce texte n'a pas encore été publié par l'administrateur de la plateforme.
+        </p>
+      {% endif %}
+    </div>
+  </article>
+</div>
+{% endblock %}

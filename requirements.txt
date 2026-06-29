@@ -32,6 +32,9 @@ weasyprint==69.0
 # Traitement d'images
 Pillow==11.2.1
 
+# QR codes (configuration Google Authenticator / TOTP)
+qrcode==8.2
+
 # Utilitaires Django (shell_plus, etc.)
 django-extensions==4.1
 

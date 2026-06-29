@@ -63,6 +63,10 @@ class Signification(models.Model):
         help_text='ID de la demande de signature Yousign')
     yousign_statut = models.CharField(max_length=30, blank=True,
         help_text='Statut Yousign : pending, ongoing, done, rejected, expired, canceled')
+    yousign_signer_id = models.CharField(max_length=100, blank=True,
+        help_text='ID du signataire Yousign (huissier)')
+    yousign_audit_trail_chiffre = models.BinaryField(null=True, blank=True,
+        help_text='Dossier de preuve Yousign (audit trail PDF chiffré)')
 
     class Meta:
         verbose_name = 'Signification'

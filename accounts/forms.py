@@ -1,5 +1,7 @@
 from django import forms
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.utils.html import escape
 import re
 from .models import User
@@ -38,9 +40,10 @@ class MFACodeForm(forms.Form):
 
     def clean_code(self):
         code = self.cleaned_data.get('code', '').strip()
+        code = re.sub(r'\D', '', code)
         if not re.match(r'^\d{6}$', code):
             raise forms.ValidationError("Le code doit contenir exactement 6 chiffres.")
-        return escape(code)
+        return code
 
 
 class InscriptionHuissierForm(forms.Form):
@@ -61,6 +64,15 @@ class InscriptionHuissierForm(forms.Form):
         label="Confirmer le mot de passe"
     )
     accepter_cgu = forms.BooleanField(required=True, label="J'accepte les CGU et la politique de confidentialité")
+
+    def clean_mot_de_passe(self):
+        mdp = self.cleaned_data.get('mot_de_passe', '')
+        if mdp:
+            try:
+                validate_password(mdp)
+            except ValidationError as exc:
+                raise forms.ValidationError(exc.messages)
+        return mdp
 
     def clean(self):
         cleaned = super().clean()
@@ -99,8 +111,23 @@ class InscriptionJusticiableForm(forms.Form):
         widget=forms.EmailInput(attrs={'class': 'form-input'}),
         label="Email d'élection de domicile électronique"
     )
-    mot_de_passe = forms.CharField(min_length=10, widget=forms.PasswordInput(attrs={'class': 'form-input'}), label="Mot de passe")
-    confirmer_mdp = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-input'}), label="Confirmer le mot de passe")
+    mot_de_passe = forms.CharField(
+        min_length=10,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'autocomplete': 'new-password',
+            'aria-describedby': 'mdp-exigences',
+        }),
+        label="Mot de passe",
+    )
+    confirmer_mdp = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'autocomplete': 'new-password',
+            'aria-describedby': 'mdp-exigences',
+        }),
+        label="Confirmer le mot de passe",
+    )
     accepter_cgu = forms.BooleanField(required=True, label="J'accepte les CGU")
 
     def clean_email_domicile(self):
@@ -148,6 +175,20 @@ class InscriptionJusticiableForm(forms.Form):
                 "Ce numéro NPI est déjà associé à un compte justiciable."
             )
         return escape(npi)
+
+    def clean_mot_de_passe(self):
+        mdp = self.cleaned_data.get('mot_de_passe', '')
+        if mdp:
+            user = User(
+                email=self.data.get('email_domicile', '').strip().lower(),
+                first_name=self.data.get('prenom', '').strip(),
+                last_name=self.data.get('nom', '').strip(),
+            )
+            try:
+                validate_password(mdp, user=user)
+            except ValidationError as exc:
+                raise forms.ValidationError(exc.messages)
+        return mdp
 
     def clean(self):
         cleaned = super().clean()

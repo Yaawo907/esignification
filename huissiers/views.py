@@ -3,9 +3,38 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils.html import escape
+from django.contrib import messages
 from accounts.models import User
 from .models import ProfilHuissier
 from significations.models import Signification
+
+
+def _get_huissier(request):
+    if request.user.role == User.HUISSIER:
+        return request.user.profil_huissier
+    return request.user.profil_clerc.huissier
+
+
+def _sidebar_badges(request, huissier):
+    from justiciables.models import DemandeModificationProfil
+    from messagerie.models import Message
+    from django.db.models import Q
+    nb_demandes_modif = DemandeModificationProfil.objects.filter(
+        huissier=huissier, statut='en_attente'
+    ).count()
+    nb_messages_non_lus = Message.objects.filter(
+        Q(conversation__participant_1=request.user) | Q(conversation__participant_2=request.user),
+        lu=False,
+    ).exclude(auteur=request.user).count()
+    stats_en_attente = Signification.objects.filter(
+        huissier=huissier,
+        statut__in=['en_attente', 'relance_1', 'relance_2'],
+    ).count()
+    return {
+        'nb_demandes_modif': nb_demandes_modif,
+        'nb_messages_non_lus': nb_messages_non_lus,
+        'stats_en_attente': stats_en_attente,
+    }
 
 
 def huissier_required(view_func):
@@ -29,22 +58,11 @@ def tableau_de_bord(request):
         'reponses_non_vues': significations.filter(statut='repondu', reponse__vue_par_huissier=False).count(),
     }
     recentes = significations.order_by('-date_envoi')[:10]
-    from justiciables.models import DemandeModificationProfil
-    nb_demandes_modif = DemandeModificationProfil.objects.filter(
-        huissier=huissier, statut='en_attente'
-    ).count()
-    from messagerie.models import Message
-    from django.db.models import Q
-    nb_messages_non_lus = Message.objects.filter(
-        Q(conversation__participant_1=request.user) | Q(conversation__participant_2=request.user),
-        lu=False
-    ).exclude(auteur=request.user).count()
     return render(request, 'huissiers/tableau_de_bord.html', {
         'huissier': huissier,
         'stats': stats,
         'significations_recentes': recentes,
-        'nb_demandes_modif': nb_demandes_modif,
-        'nb_messages_non_lus': nb_messages_non_lus,
+        **_sidebar_badges(request, huissier),
     })
 
 
@@ -117,6 +135,7 @@ def liste_significations(request):
         'params_str': params.urlencode(),
         'statut_filtre': statut, 'periode': periode,
         'STATUTS': Signification.STATUT_CHOICES,
+        **_sidebar_badges(request, huissier),
     })
 
 
@@ -536,6 +555,66 @@ def traiter_demande_modification(request, uuid):
     return render(request, 'huissiers/traiter_demande_modification.html', {'demande': demande})
 
 
+# ─── Profil huissier ───────────────────────────────────────────────────────────
+
+@login_required
+@huissier_required
+def profil_huissier(request):
+    if request.user.role != User.HUISSIER:
+        messages.info(request, "Seul l'huissier titulaire peut modifier le profil de l'étude.")
+        return redirect('huissiers:tableau_de_bord')
+
+    huissier = request.user.profil_huissier
+    from accounts.forms import ModificationMotDePasseForm
+    from .forms import ProfilHuissierForm
+    from securite.audit import journaliser
+
+    form_profil = ProfilHuissierForm(instance=huissier)
+    form_mdp = ModificationMotDePasseForm(user=request.user)
+    user = request.user
+
+    from accounts.mfa_profil import contexte_mfa_profil, traiter_action_mfa_profil
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+
+        if action == 'profil':
+            form_profil = ProfilHuissierForm(request.POST, instance=huissier)
+            if form_profil.is_valid():
+                form_profil.save()
+                journaliser(request.user, 'profil_huissier_modifie', 'ProfilHuissier', huissier.uuid, request=request)
+                messages.success(request, "Profil mis à jour.")
+                return redirect('huissiers:profil')
+
+        elif action == 'changer_mdp':
+            form_mdp = ModificationMotDePasseForm(user=request.user, data=request.POST)
+            if form_mdp.is_valid():
+                request.user.set_password(form_mdp.cleaned_data['nouveau_mdp'])
+                request.user.save()
+                journaliser(request.user, 'modification_mot_de_passe', request=request)
+                messages.success(request, "Mot de passe modifié. Reconnectez-vous.")
+                from django.contrib.auth import logout
+                logout(request)
+                return redirect('/connexion/')
+
+        else:
+            mfa_redirect = traiter_action_mfa_profil(
+                request, user, 'huissiers:profil', telephone=huissier.telephone,
+            )
+            if mfa_redirect:
+                return mfa_redirect
+
+    user.refresh_from_db(fields=['mfa_methode', 'totp_secret'])
+
+    return render(request, 'huissiers/profil.html', {
+        'huissier': huissier,
+        'form_profil': form_profil,
+        'form_mdp': form_mdp,
+        **contexte_mfa_profil(user, request.session),
+        **_sidebar_badges(request, huissier),
+    })
+
+
 # ─── Paramètres signatures ────────────────────────────────────────────────────
 
 @login_required
@@ -619,4 +698,5 @@ def parametres_signatures(request):
     return render(request, 'huissiers/parametres_signatures.html', {
         'huissier': huissier,
         'params': params,
+        **_sidebar_badges(request, huissier),
     })
