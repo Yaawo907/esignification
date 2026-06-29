@@ -248,8 +248,9 @@
     </div><!-- /content-area -->
   </main>
 </div>
+{% endblock %}
 
-<!-- ── Styles locaux ── -->
+{% block extra_head %}
 <style>
   .stat-card-link { transition: box-shadow .15s, border-color .15s; cursor: pointer; }
   .stat-card-link:hover { box-shadow: 0 2px 12px rgba(26,60,110,.12); border-color: var(--primary-border); }
@@ -258,8 +259,6 @@
   .sidebar-user-dark .user-role { color: rgba(255,255,255,.45); }
   .logout-white { color: rgba(255,255,255,.5); text-decoration:none; }
   .logout-white:hover { color:#fff; }
-
-  /* Ligne en chargement AJAX */
   tr.row-loading td { opacity: .5; pointer-events: none; }
   tr.row-loading td:last-child::after {
     content: '';
@@ -269,8 +268,8 @@
     vertical-align: middle; margin-left: 8px;
   }
 </style>
+{% endblock %}
 
-<!-- ── Scripts AJAX ── -->
 {% block extra_scripts %}
 <script>
 'use strict';
@@ -469,6 +468,4 @@ function createToastContainer() {
   return c;
 }
 </script>
-{% endblock %}
-
 {% endblock %}

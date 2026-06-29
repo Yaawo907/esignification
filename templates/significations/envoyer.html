@@ -303,6 +303,24 @@
     </div><!-- /content-area -->
   </main>
 </div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.sig-choix {
+  border: 2px solid var(--border); border-radius: 10px;
+  padding: 12px 10px; cursor: pointer; background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+  display: block;
+}
+.sig-choix:hover { border-color: var(--primary); }
+.sig-choix-active {
+  border-color: var(--primary) !important;
+  background: #f0fdf4;
+  box-shadow: 0 0 0 3px rgba(21,128,61,.12);
+}
+</style>
+{% endblock %}
 
 {% block extra_scripts %}
 <script>
@@ -535,21 +553,4 @@ function afficherNomFichier(input) {
 
 validerFormulaire();
 </script>
-
-<style>
-.sig-choix {
-  border: 2px solid var(--border); border-radius: 10px;
-  padding: 12px 10px; cursor: pointer; background: #fff;
-  transition: border-color .15s, box-shadow .15s;
-  display: block;
-}
-.sig-choix:hover { border-color: var(--primary); }
-.sig-choix-active {
-  border-color: var(--primary) !important;
-  background: #f0fdf4;
-  box-shadow: 0 0 0 3px rgba(21,128,61,.12);
-}
-</style>
-{% endblock %}
-
 {% endblock %}
