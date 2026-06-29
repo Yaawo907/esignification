@@ -1,16 +1,41 @@
-{% extends 'base/base.html' %}
+﻿{% extends 'base/base.html' %}
 {% block title %}Nouvelle signification{% endblock %}
 {% block body_class %}dashboard-page{% endblock %}
 
 {% block body %}
 <div class="dashboard-layout">
 
-  {% include 'huissiers/_sidebar.html' %}
+  <aside class="sidebar sidebar-huissier">
+    <div class="sidebar-logo">
+      {% include 'base/_logo_sm.html' %}
+      <div>
+        <div class="logo-name">e-Signification</div>
+        <div class="logo-sub">Espace huissier</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <a href="{% url 'huissiers:tableau_de_bord' %}" class="nav-item spinner-link">▦ Tableau de bord</a>
+      <a href="{% url 'huissiers:significations' %}" class="nav-item spinner-link">✉ Significations</a>
+      <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link">⌕ Rechercher</a>
+      <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link">+ Inviter</a>
+      <div class="nav-section" style="margin-top:10px;">Étude</div>
+      <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item spinner-link">👥 Mes clercs</a>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+      <div>
+        <div class="user-name">{{ request.user.email }}</div>
+        <div class="user-role">Huissier</div>
+      </div>
+      <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
+    </div>
+  </aside>
 
   <main class="dashboard-main">
 
     <header class="topbar">
-      <button class="btn-hamburger" id="btn-hamburger" type="button" aria-label="Ouvrir le menu" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="2" rx="1"/><rect x="1" y="9" width="18" height="2" rx="1"/><rect x="1" y="15" width="18" height="2" rx="1"/></svg></button>
+      <button class="btn-hamburger" id="btn-hamburger" type="button" aria-label="Ouvrir le menu"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="2" rx="1"/><rect x="1" y="9" width="18" height="2" rx="1"/><rect x="1" y="15" width="18" height="2" rx="1"/></svg></button>
       <div>
         <h1 class="topbar-title">Nouvelle signification</h1>
         <div class="topbar-sub">Remplissez le formulaire et joignez l'acte PDF signé</div>
@@ -149,7 +174,7 @@
            ETAPE 2 + ENVOI : form POST (aucun form imbriqué)
            ══════════════════════════════════════════════════════════ -->
       <form method="post" enctype="multipart/form-data" novalidate id="form-envoi"
-            data-page-spinner="Envoi de l'acte en cours…">
+            data-page-spinner="Préparation et envoi de l'acte…">
         {% csrf_token %}
         <!-- UUID mis à jour par JS quand l'utilisateur choisit un justiciable -->
         <input type="hidden" name="justiciable_uuid" id="just-uuid" value="{{ justiciable.uuid|default:'' }}">
@@ -229,7 +254,7 @@
           <div id="zone-pad-envoi" style="{% if params_sig and params_sig.signature_simple_b64 or params_sig and params_sig.signature_cachet_b64 or params_sig and params_sig.cachet_simple_b64 %}display:none;{% endif %}">
             <div style="position:relative; border:2px solid var(--border); border-radius:8px; background:#fafafa; overflow:hidden;">
               <canvas id="sig-canvas" width="620" height="150"
-                      style="display:block; width:100%; height:150px; min-height:150px; touch-action:none; cursor:crosshair;"></canvas>
+                      style="display:block; width:100%; touch-action:none; cursor:crosshair;"></canvas>
               <div id="sig-placeholder" style="position:absolute; inset:0; display:flex; align-items:center;
                    justify-content:center; pointer-events:none; font-size:14px; color:#ccc;">
                 ✍&nbsp; Signez ici
@@ -269,8 +294,7 @@
           <a href="{% url 'huissiers:significations' %}" class="btn btn-ghost">Annuler</a>
           <button type="submit" id="btn-envoyer" class="btn btn-primary btn-spinner"
             data-loading="Envoi en cours…" disabled style="opacity:.5; cursor:not-allowed;">
-            <span class="btn-text">✉ Envoyer la signification</span>
-            <span class="btn-loader" style="display:none;"></span>
+            ✉ Envoyer la signification
           </button>
         </div>
 
@@ -279,7 +303,6 @@
     </div><!-- /content-area -->
   </main>
 </div>
-{% endblock %}
 
 {% block extra_scripts %}
 <script>
@@ -289,30 +312,16 @@ var justiciableSelectionne = {% if justiciable %}true{% else %}false{% endif %};
 var fichierSelectionne = false;
 var signatureApposee = false;
 
-function etatFormulaireEnvoi() {
-  var uuidEl = document.getElementById('just-uuid');
-  var fileEl = document.getElementById('fichier_acte');
-  var sigEl = document.getElementById('sig-b64');
-  var justOk = !!(uuidEl && uuidEl.value.trim());
-  var fileOk = !!(fileEl && fileEl.files && fileEl.files.length > 0);
-  var sigVal = sigEl ? sigEl.value.trim() : '';
-  var sigOk = sigVal.indexOf('data:image/') === 0 && sigVal.length > 100;
-  return { justOk: justOk, fileOk: fileOk, sigOk: sigOk, ok: justOk && fileOk && sigOk };
-}
-
 /* Activer/désactiver le bouton Envoyer */
 function validerFormulaire() {
   var btn = document.getElementById('btn-envoyer');
   var recap = document.getElementById('recap-envoi');
   if (!btn) return;
-  var etat = etatFormulaireEnvoi();
-  justiciableSelectionne = etat.justOk;
-  fichierSelectionne = etat.fileOk;
-  signatureApposee = etat.sigOk;
-  btn.disabled = !etat.ok;
-  btn.style.opacity = etat.ok ? '1' : '.5';
-  btn.style.cursor = etat.ok ? 'pointer' : 'not-allowed';
-  if (recap) recap.style.display = etat.ok ? 'block' : 'none';
+  var ok = justiciableSelectionne && fichierSelectionne && signatureApposee;
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '.5';
+  btn.style.cursor = ok ? 'pointer' : 'not-allowed';
+  if (recap) recap.style.display = ok ? 'block' : 'none';
 }
 
 /* ── Choix d'une signature enregistrée ─────────────────────────────────── */
@@ -337,15 +346,7 @@ function choisirSigEnregistree(b64, radioId) {
 function choisirPad() {
   document.getElementById('sig-b64').value = '';
   var pad = document.getElementById('zone-pad-envoi');
-  if (pad) {
-    pad.style.display = 'block';
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        if (typeof window.preparerPadEnvoi === 'function') window.preparerPadEnvoi();
-      });
-    });
-    pad.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+  if (pad) pad.style.display = 'block';
   var wrap = document.getElementById('sig-preview-wrap');
   if (wrap) wrap.style.display = 'none';
   document.querySelectorAll('.sig-choix').forEach(function(el) { el.classList.remove('sig-choix-active'); });
@@ -370,32 +371,24 @@ function reinitSig() {
   if (!canvas) return;
   var ctx = canvas.getContext('2d');
   var drawing = false;
-  var hasDrawn = false;
   var lastX = 0, lastY = 0;
   var placeholder = document.getElementById('sig-placeholder');
   var status = document.getElementById('sig-status');
   var b64Input = document.getElementById('sig-b64');
 
-  // Ajuster la résolution physique du canvas (recalcul quand le pad devient visible)
+  // Ajuster la résolution physique du canvas
   function resizeCanvas() {
     var rect = canvas.getBoundingClientRect();
     var ratio = window.devicePixelRatio || 1;
-    var w = rect.width || canvas.offsetWidth || 620;
-    var h = rect.height || canvas.offsetHeight || 150;
-    canvas.width = w * ratio;
-    canvas.height = h * ratio;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
     ctx.scale(ratio, ratio);
     ctx.strokeStyle = '#1a1a3e';
     ctx.lineWidth = 2.2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
   }
-  window.preparerPadEnvoi = resizeCanvas;
-  if (document.getElementById('zone-pad-envoi') &&
-      document.getElementById('zone-pad-envoi').style.display !== 'none') {
-    resizeCanvas();
-  }
+  resizeCanvas();
 
   function getPos(e) {
     var rect = canvas.getBoundingClientRect();
@@ -406,7 +399,6 @@ function reinitSig() {
   function startDraw(e) {
     e.preventDefault();
     drawing = true;
-    hasDrawn = false;
     var p = getPos(e);
     lastX = p.x; lastY = p.y;
     ctx.beginPath();
@@ -417,7 +409,6 @@ function reinitSig() {
     if (!drawing) return;
     e.preventDefault();
     var p = getPos(e);
-    if (Math.abs(p.x - lastX) > 1 || Math.abs(p.y - lastY) > 1) hasDrawn = true;
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
     lastX = p.x; lastY = p.y;
@@ -426,10 +417,7 @@ function reinitSig() {
     if (!drawing) return;
     drawing = false;
     ctx.closePath();
-    if (!hasDrawn) {
-      validerFormulaire();
-      return;
-    }
+    // Exporter en base64 PNG et mettre dans le champ caché
     var data = canvas.toDataURL('image/png');
     if (b64Input) b64Input.value = data;
     signatureApposee = true;
@@ -545,19 +533,6 @@ function afficherNomFichier(input) {
 })();
 {% endif %}
 
-{% if resultats_recherche|length == 1 %}
-(function() {
-  var j = {
-    uuid: '{{ resultats_recherche.0.uuid }}',
-    nom: '{% if resultats_recherche.0.prenom %}{{ resultats_recherche.0.prenom|escapejs }} {% endif %}{{ resultats_recherche.0.nom|escapejs }}',
-    email: '{{ resultats_recherche.0.email_domicile|escapejs }}',
-    initiales: '{% if resultats_recherche.0.prenom %}{{ resultats_recherche.0.prenom|first|escapejs }}{% endif %}{{ resultats_recherche.0.nom|first|escapejs }}',
-    detail: '{% if resultats_recherche.0.npi %}NPI : {{ resultats_recherche.0.npi|escapejs }}{% endif %}{% if resultats_recherche.0.npi and resultats_recherche.0.ifu %} · {% endif %}{% if resultats_recherche.0.ifu %}IFU : {{ resultats_recherche.0.ifu|escapejs }}{% endif %}'
-  };
-  choisirJusticiable(j.uuid, j.nom, j.email, j.initiales, j.detail);
-})();
-{% endif %}
-
 validerFormulaire();
 </script>
 
@@ -575,4 +550,6 @@ validerFormulaire();
   box-shadow: 0 0 0 3px rgba(21,128,61,.12);
 }
 </style>
+{% endblock %}
+
 {% endblock %}

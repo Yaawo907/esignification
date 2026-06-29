@@ -48,6 +48,108 @@ function hideSpinner() {
   if (spinnerGlobal) spinnerGlobal.style.display = 'none';
 }
 
+/* ── Sidebar mobile : hamburger (exécuté dès le chargement de main.js) ── */
+function initSidebarMobile() {
+  var sidebar = document.querySelector('.sidebar');
+  if (!sidebar) { window.toggleSidebar = function(){}; return; }
+
+  var BREAKPOINT = 768;
+  var isOpen = false;
+
+  function isMobile() {
+    return window.innerWidth <= BREAKPOINT;
+  }
+
+  var overlay = document.getElementById('sidebar-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'sidebar-overlay';
+    overlay.className = 'sidebar-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  var btn = document.getElementById('btn-hamburger');
+  if (!btn) {
+    var topbar = document.querySelector('.topbar');
+    if (!topbar) { window.toggleSidebar = function(){}; return; }
+    btn = document.createElement('button');
+    btn.className = 'btn-hamburger';
+    btn.id = 'btn-hamburger';
+    btn.setAttribute('aria-label', 'Ouvrir le menu');
+    btn.setAttribute('type', 'button');
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', '20'); svg.setAttribute('height', '20');
+    svg.setAttribute('viewBox', '0 0 20 20'); svg.setAttribute('fill', 'currentColor');
+    ['3', '9', '15'].forEach(function (y) {
+      var r = document.createElementNS(svgNS, 'rect');
+      r.setAttribute('x', '1'); r.setAttribute('y', y);
+      r.setAttribute('width', '18'); r.setAttribute('height', '2'); r.setAttribute('rx', '1');
+      svg.appendChild(r);
+    });
+    btn.appendChild(svg);
+    topbar.insertBefore(btn, topbar.firstElementChild);
+  }
+
+  function appliquerMobile() {
+    btn.style.setProperty('display', 'flex', 'important');
+    if (!isOpen) sidebar.classList.remove('open');
+  }
+
+  function reinitialiserDesktop() {
+    sidebar.classList.remove('open');
+    btn.style.removeProperty('display');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    isOpen = false;
+  }
+
+  function ouvrirMenu() {
+    if (!isMobile()) return;
+    isOpen = true;
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    btn.setAttribute('aria-label', 'Fermer le menu');
+  }
+
+  function fermerMenu() {
+    isOpen = false;
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    btn.setAttribute('aria-label', 'Ouvrir le menu');
+  }
+
+  window.toggleSidebar = function () {
+    if (!isMobile()) return;
+    isOpen ? fermerMenu() : ouvrirMenu();
+  };
+
+  if (isMobile()) appliquerMobile();
+  else reinitialiserDesktop();
+
+  btn.removeAttribute('onclick');
+  btn.addEventListener('click', function (e) {
+    e.preventDefault();
+    window.toggleSidebar();
+  });
+  overlay.addEventListener('click', fermerMenu);
+
+  sidebar.querySelectorAll('.nav-item').forEach(function (item) {
+    item.addEventListener('click', function () {
+      if (isMobile() && isOpen) fermerMenu();
+    });
+  });
+
+  window.addEventListener('resize', function () {
+    if (isMobile()) appliquerMobile();
+    else reinitialiserDesktop();
+  });
+}
+
+initSidebarMobile();
+
 /* Déclenche le spinner sur tous les liens .spinner-link */
 document.addEventListener('DOMContentLoaded', function() {
 
@@ -70,26 +172,32 @@ document.addEventListener('DOMContentLoaded', function() {
   /* ── Spinner sur boutons de formulaire (btn-spinner) ── */
   document.querySelectorAll('form').forEach(function(form) {
     form.addEventListener('submit', function() {
-      const pageMsg = form.getAttribute('data-page-spinner');
-      if (pageMsg) {
-        showSpinner();
-        const st = document.querySelector('#spinner-global .spinner-text');
-        if (st) st.textContent = pageMsg;
-      }
       const btn = form.querySelector('.btn-spinner');
       if (btn && !btn.disabled) {
         const loadingText = btn.getAttribute('data-loading') || 'Chargement…';
         const textEl = btn.querySelector('.btn-text');
         const loaderEl = btn.querySelector('.btn-loader');
+        const spinSvg = '<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></path></svg> ';
         if (textEl) textEl.style.display = 'none';
         if (loaderEl) {
           loaderEl.style.display = 'inline-flex';
-          loaderEl.innerHTML = '<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></path></svg> ' + escapeHtml(loadingText);
-        } else if (!textEl) {
+          loaderEl.style.alignItems = 'center';
+          loaderEl.style.gap = '6px';
+          loaderEl.innerHTML = spinSvg + escapeHtml(loadingText);
+        } else if (!btn.dataset.loadingActive) {
           btn.dataset.originalHtml = btn.innerHTML;
-          btn.innerHTML = '<svg class="spin-icon" viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.3"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></path></svg> ' + escapeHtml(loadingText);
+          btn.dataset.loadingActive = '1';
+          btn.innerHTML = spinSvg + escapeHtml(loadingText);
         }
         btn.disabled = true;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'wait';
+      }
+      const pageMsg = form.getAttribute('data-page-spinner');
+      if (pageMsg) {
+        showSpinner();
+        const st = document.querySelector('#spinner-global .spinner-text');
+        if (st) st.textContent = pageMsg;
       }
     });
   });
@@ -130,118 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('[role=dialog]').forEach(function(modal) {
     trapFocus(modal);
   });
-
-  /* ── Sidebar mobile : hamburger ── */
-  (function () {
-    var sidebar = document.querySelector('.sidebar');
-    if (!sidebar) { window.toggleSidebar = function(){}; return; }
-
-    var BREAKPOINT = 768;
-    var isOpen = false;
-
-    /* ── Overlay ── */
-    var overlay = document.createElement('div');
-    overlay.className = 'sidebar-overlay';
-    document.body.appendChild(overlay);
-
-    /* ── Bouton hamburger : utiliser celui du HTML, sinon créer ── */
-    var btn = document.getElementById('btn-hamburger');
-    if (!btn) {
-      var topbar = document.querySelector('.topbar');
-      if (!topbar) return;
-      btn = document.createElement('button');
-      btn.className = 'btn-hamburger';
-      btn.setAttribute('aria-label', 'Ouvrir le menu');
-      btn.setAttribute('type', 'button');
-      var svgNS = 'http://www.w3.org/2000/svg';
-      var svg = document.createElementNS(svgNS, 'svg');
-      svg.setAttribute('width', '20'); svg.setAttribute('height', '20');
-      svg.setAttribute('viewBox', '0 0 20 20'); svg.setAttribute('fill', 'currentColor');
-      ['3', '9', '15'].forEach(function (y) {
-        var r = document.createElementNS(svgNS, 'rect');
-        r.setAttribute('x', '1'); r.setAttribute('y', y);
-        r.setAttribute('width', '18'); r.setAttribute('height', '2'); r.setAttribute('rx', '1');
-        svg.appendChild(r);
-      });
-      btn.appendChild(svg);
-      topbar.insertBefore(btn, topbar.firstElementChild);
-    }
-
-    /* ── Appliquer les styles inline selon le mode ── */
-    function appliquerMobile() {
-      /* Forcer la sidebar en tiroir hors écran */
-      sidebar.style.setProperty('position', 'fixed', 'important');
-      sidebar.style.setProperty('top', '0', 'important');
-      sidebar.style.setProperty('left', '0', 'important');
-      sidebar.style.setProperty('bottom', '0', 'important');
-      sidebar.style.setProperty('height', '100vh', 'important');
-      sidebar.style.setProperty('width', '270px', 'important');
-      sidebar.style.setProperty('z-index', '999', 'important');
-      sidebar.style.setProperty('overflow-y', 'auto', 'important');
-      sidebar.style.setProperty('transition', 'transform .25s ease', 'important');
-      sidebar.style.setProperty('transform', isOpen ? 'translateX(0)' : 'translateX(-100%)', 'important');
-      /* Bouton hamburger visible */
-      btn.style.setProperty('display', 'flex', 'important');
-    }
-
-    function reinitialiserDesktop() {
-      /* Retirer tous les styles inline */
-      sidebar.style.removeProperty('position');
-      sidebar.style.removeProperty('top');
-      sidebar.style.removeProperty('left');
-      sidebar.style.removeProperty('bottom');
-      sidebar.style.removeProperty('height');
-      sidebar.style.removeProperty('width');
-      sidebar.style.removeProperty('z-index');
-      sidebar.style.removeProperty('overflow-y');
-      sidebar.style.removeProperty('transition');
-      sidebar.style.removeProperty('transform');
-      btn.style.removeProperty('display');
-      overlay.classList.remove('open');
-      document.body.style.overflow = '';
-      isOpen = false;
-    }
-
-    function ouvrirMenu() {
-      isOpen = true;
-      sidebar.style.setProperty('transform', 'translateX(0)', 'important');
-      overlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
-      btn.setAttribute('aria-label', 'Fermer le menu');
-    }
-
-    function fermerMenu() {
-      isOpen = false;
-      sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
-      overlay.classList.remove('open');
-      document.body.style.overflow = '';
-      btn.setAttribute('aria-label', 'Ouvrir le menu');
-    }
-
-    /* Fonction globale — utilisée aussi par l'onclick HTML du bouton */
-    window.toggleSidebar = function () {
-      isOpen ? fermerMenu() : ouvrirMenu();
-    };
-
-    /* Initialisation */
-    if (window.innerWidth <= BREAKPOINT) appliquerMobile();
-    else reinitialiserDesktop();
-
-    btn.addEventListener('click', window.toggleSidebar);
-    overlay.addEventListener('click', fermerMenu);
-
-    sidebar.querySelectorAll('.nav-item').forEach(function (item) {
-      item.addEventListener('click', fermerMenu);
-    });
-
-    window.addEventListener('resize', function () {
-      if (window.innerWidth <= BREAKPOINT) {
-        appliquerMobile();
-      } else {
-        reinitialiserDesktop();
-      }
-    });
-  })();
 
 });
 

@@ -35,55 +35,6 @@
   .table-wrap{overflow-x:auto!important;-webkit-overflow-scrolling:touch;}
 }
 </style>
-<script>
-/* Hamburger sidebar — fonction disponible immediatement, sans attendre main.js */
-function toggleSidebar() {
-  var s = document.querySelector('.sidebar');
-  if (!s) return;
-  var ouvert = s.getAttribute('data-menu-ouvert') === '1';
-  if (ouvert) {
-    s.style.setProperty('transform', 'translateX(-100%)', 'important');
-    s.setAttribute('data-menu-ouvert', '0');
-    document.body.style.overflow = '';
-    var ov = document.getElementById('sidebar-overlay');
-    if (ov) ov.style.display = 'none';
-  } else {
-    s.style.setProperty('position', 'fixed', 'important');
-    s.style.setProperty('top', '0', 'important');
-    s.style.setProperty('left', '0', 'important');
-    s.style.setProperty('bottom', '0', 'important');
-    s.style.setProperty('height', '100vh', 'important');
-    s.style.setProperty('width', '270px', 'important');
-    s.style.setProperty('z-index', '999', 'important');
-    s.style.setProperty('overflow-y', 'auto', 'important');
-    s.style.setProperty('transition', 'transform .25s ease', 'important');
-    s.style.setProperty('transform', 'translateX(0)', 'important');
-    s.setAttribute('data-menu-ouvert', '1');
-    document.body.style.overflow = 'hidden';
-    var ov = document.getElementById('sidebar-overlay');
-    if (ov) ov.style.display = 'block';
-  }
-}
-document.addEventListener('DOMContentLoaded', function() {
-  /* Creer overlay si absent */
-  if (!document.getElementById('sidebar-overlay')) {
-    var ov = document.createElement('div');
-    ov.id = 'sidebar-overlay';
-    ov.className = 'sidebar-overlay';
-    ov.onclick = toggleSidebar;
-    document.body.appendChild(ov);
-  }
-  /* Fermer sidebar quand on clique un lien nav */
-  var sidebar = document.querySelector('.sidebar');
-  if (sidebar) {
-    sidebar.querySelectorAll('.nav-item').forEach(function(item) {
-      item.addEventListener('click', function() {
-        if (sidebar.getAttribute('data-menu-ouvert') === '1') toggleSidebar();
-      });
-    });
-  }
-});
-</script>
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <div id="spinner-global" class="spinner-overlay" style="display:none;" role="status">
@@ -112,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 {% endif %}
 {% block body %}{% endblock %}
-<script src="{% static 'js/main.js' %}?v=6"></script>
+<script src="{% static 'js/main.js' %}?v=9"></script>
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>
