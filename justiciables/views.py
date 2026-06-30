@@ -245,14 +245,35 @@ def envoyer_reponse(request, uuid):
     if request.method == 'POST':
         texte = request.POST.get('texte_reponse', '').strip()
         fichier = request.FILES.get('fichier_reponse')
+        signature_b64 = request.POST.get('signature_b64', '').strip()
+
+        from significations.pdf_reponse import _signature_b64_valide
+
+        def _ctx_erreur():
+            return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
 
         if not texte and not fichier:
             messages.error(request, "Saisissez votre réponse ou joignez un document PDF.")
-            return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
+            return _ctx_erreur()
 
         if texte and len(texte) < 10:
             messages.error(request, "Votre réponse doit contenir au moins 10 caractères.")
-            return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
+            return _ctx_erreur()
+
+        if texte and not _signature_b64_valide(signature_b64):
+            messages.error(request, "Veuillez apposer votre signature (pad ou import d'image) avant d'envoyer.")
+            return _ctx_erreur()
+
+        if signature_b64:
+            import base64
+            try:
+                sig_bytes = base64.b64decode(signature_b64.split(',', 1)[1])
+                if len(sig_bytes) > 500 * 1024:
+                    messages.error(request, "L'image de signature ne doit pas dépasser 500 Ko.")
+                    return _ctx_erreur()
+            except Exception:
+                messages.error(request, "Signature invalide — veuillez dessiner ou importer une image.")
+                return _ctx_erreur()
 
         annexe_bytes = None
         annexe_nom = ''
@@ -260,11 +281,11 @@ def envoyer_reponse(request, uuid):
         if fichier:
             if not fichier.name.lower().endswith('.pdf'):
                 messages.error(request, "Seuls les fichiers PDF sont acceptés en annexe.")
-                return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
+                return _ctx_erreur()
             annexe_bytes = fichier.read()
             if len(annexe_bytes) > 20 * 1024 * 1024:
                 messages.error(request, "L'annexe ne doit pas dépasser 20 Mo.")
-                return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
+                return _ctx_erreur()
             annexe_nom = escape(fichier.name)
             annexe_hash = hash_fichier(annexe_bytes)
 
@@ -275,6 +296,7 @@ def envoyer_reponse(request, uuid):
             hash_contenu=hash_contenu,
             nom_fichier_annexe=annexe_nom,
             hash_annexe=annexe_hash,
+            signature_justiciable_b64=signature_b64 if texte else '',
         )
         if texte:
             reponse.enregistrer_texte(texte)

@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
+from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponse, Http404
 from django.utils.html import escape
@@ -244,9 +245,18 @@ def envoyer_signification(request):
     })
 
 
+def _redirect_apres_acceptation(request, sig):
+    """Redirection idempotente après acceptation (premier clic ou re-clic)."""
+    request.session['sig_acceptee_ref'] = sig.reference
+    email_justiciable = sig.justiciable.user.email
+    from urllib.parse import urlencode
+    params = urlencode({'next': '/justiciable/', 'email': email_justiciable})
+    return redirect(f"/connexion/?{params}")
+
+
+@transaction.atomic
 def repondre_signification(request, uuid):
     """Gère les clics Accepter/Refuser depuis l'email"""
-    sig = get_object_or_404(Signification, uuid=uuid)
     action = request.GET.get('action', '')
     token_brut = request.GET.get('token', '')
     from securite.tokens import valider_token
@@ -254,9 +264,22 @@ def repondre_signification(request, uuid):
     token_obj, erreur = valider_token(token_brut, TokenActivation.MFA_CODE)
     if erreur or token_obj.metadata.get('sig_uuid') != str(uuid):
         return render(request, 'significations/lien_invalide.html')
-    from securite.tokens import marquer_token_utilise
-    marquer_token_utilise(token_obj)
+
+    try:
+        sig = Signification.objects.select_for_update().get(uuid=uuid)
+    except Signification.DoesNotExist:
+        raise Http404
+
     if action == 'accepter':
+        if sig.statut == Signification.STATUT_ACCEPTEE:
+            return _redirect_apres_acceptation(request, sig)
+        if sig.statut != Signification.STATUT_EN_ATTENTE and sig.statut not in (
+            Signification.STATUT_RELANCE_1, Signification.STATUT_RELANCE_2,
+        ):
+            return render(request, 'significations/lien_invalide.html')
+
+        from securite.tokens import marquer_token_utilise
+        marquer_token_utilise(token_obj)
         sig.statut = Signification.STATUT_ACCEPTEE
         sig.date_acceptation = timezone.now()
         sig.save(update_fields=['statut', 'date_acceptation'])
@@ -264,13 +287,18 @@ def repondre_signification(request, uuid):
         rembourser_selon_reponse_client(sig, Signification.STATUT_ACCEPTEE)
         _generer_certificat(sig)
         journaliser(sig.justiciable.user, 'signification_acceptee', 'Signification', sig.uuid)
-        # Rediriger vers connexion avec email pré-rempli
-        request.session['sig_acceptee_ref'] = sig.reference
-        email_justiciable = sig.justiciable.user.email
-        from urllib.parse import urlencode
-        params = urlencode({'next': '/justiciable/', 'email': email_justiciable})
-        return redirect(f"/connexion/?{params}")
+        return _redirect_apres_acceptation(request, sig)
+
     elif action == 'refuser':
+        if sig.statut == Signification.STATUT_REFUSEE:
+            return render(request, 'significations/refus_confirme.html', {'sig': sig})
+        if sig.statut != Signification.STATUT_EN_ATTENTE and sig.statut not in (
+            Signification.STATUT_RELANCE_1, Signification.STATUT_RELANCE_2,
+        ):
+            return render(request, 'significations/lien_invalide.html')
+
+        from securite.tokens import marquer_token_utilise
+        marquer_token_utilise(token_obj)
         sig.statut = Signification.STATUT_REFUSEE
         sig.date_refus = timezone.now()
         sig.save(update_fields=['statut', 'date_refus'])
@@ -278,11 +306,16 @@ def repondre_signification(request, uuid):
         rembourser_selon_reponse_client(sig, Signification.STATUT_REFUSEE)
         journaliser(sig.justiciable.user, 'signification_refusee', 'Signification', sig.uuid)
         return render(request, 'significations/refus_confirme.html', {'sig': sig})
+
     return render(request, 'significations/lien_invalide.html')
 
 
 def _generer_certificat(signification):
-    """Génère le certificat de signification et l'horodate"""
+    """Génère le certificat de signification et l'horodate (idempotent)."""
+    cert_existant = CertificatSignification.objects.filter(signification=signification).first()
+    if cert_existant:
+        return cert_existant
+
     from securite.chiffrement import hash_fichier, chiffrer_fichier
     from securite.merkle import hash_noeud
     import hashlib

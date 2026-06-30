@@ -76,9 +76,9 @@
         </div>
 
         <div style="background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:12px 16px; font-size:13px; color:#134e3a; margin-bottom:18px;">
-          <strong>ℹ Important :</strong> Saisissez votre réponse ci-dessous. Elle sera automatiquement convertie en
-          <strong>document PDF officiel horodaté</strong>, avec vos informations d'identification et les empreintes de sécurité,
-          puis transmise à l'huissier pour impression et production devant les juridictions.
+          <strong>ℹ Important :</strong> Saisissez votre réponse ci-dessous et aposez votre <strong>signature manuscrite</strong>.
+          Le tout sera converti en <strong>document PDF officiel horodaté</strong>, avec vos informations d'identification,
+          votre signature et les empreintes de sécurité, puis transmis à l'huissier pour impression et production devant les juridictions.
         </div>
 
         <form method="post" enctype="multipart/form-data" novalidate id="form-reponse">
@@ -128,6 +128,68 @@
               </div>
             </div>
           </details>
+
+          <div class="form-group" style="margin-top:20px; margin-bottom:16px;">
+            <label class="form-label">
+              Votre signature <span class="required">*</span>
+            </label>
+            <div class="form-hint" style="margin-bottom:12px;">
+              Aposez votre signature manuscrite pour renforcer la force probante du document PDF.
+              Utilisez le pad (doigt ou stylet sur mobile) ou importez une image de votre signature.
+            </div>
+
+            <div style="display:flex; gap:0; margin-bottom:12px; border:1px solid var(--border); border-radius:8px; overflow:hidden; width:fit-content;">
+              <button type="button" id="tab-dessin-sig"
+                      onclick="switchTabSig('dessin')"
+                      style="padding:7px 18px; font-size:12px; font-weight:600; border:none; cursor:pointer;
+                             background:var(--primary); color:#fff;">
+                ✍ Signer au pad
+              </button>
+              <button type="button" id="tab-import-sig"
+                      onclick="switchTabSig('import')"
+                      style="padding:7px 18px; font-size:12px; font-weight:600; border:none; cursor:pointer;
+                             background:#fff; color:var(--text-secondary);">
+                ⬆ Importer une image
+              </button>
+            </div>
+
+            <div id="panel-dessin-sig">
+              <div style="position:relative; border:2px solid var(--border); border-radius:8px; background:#fafafa; overflow:hidden;">
+                <canvas id="sig-canvas-reponse" width="620" height="150"
+                        style="display:block; width:100%; touch-action:none; cursor:crosshair;"></canvas>
+                <div id="sig-placeholder-reponse" style="position:absolute; inset:0; display:flex; align-items:center;
+                     justify-content:center; pointer-events:none; font-size:14px; color:#ccc;">
+                  ✍&nbsp; Signez ici (doigt ou souris)
+                </div>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="effacerSignatureReponse()">✕ Effacer</button>
+                <span id="sig-status-reponse" style="font-size:12px; color:var(--text-secondary);">Aucune signature</span>
+              </div>
+            </div>
+
+            <div id="panel-import-sig" style="display:none;">
+              <label id="upload-zone-sig"
+                     style="display:flex; flex-direction:column; align-items:center; justify-content:center;
+                            border:2px dashed var(--border); border-radius:8px; background:#fafafa;
+                            padding:24px 16px; cursor:pointer;"
+                     onclick="document.getElementById('sig-file-input').click()">
+                <input type="file" id="sig-file-input" accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                       style="display:none;" onchange="importerSignatureReponse(this)">
+                <div style="font-size:24px; margin-bottom:6px; opacity:.5;">🖼</div>
+                <div style="font-size:13px; font-weight:600; color:var(--text-secondary);">Cliquez pour choisir une image</div>
+                <div style="font-size:11px; color:var(--text-light); margin-top:4px;">PNG, JPG ou SVG — max 500 Ko</div>
+              </label>
+            </div>
+
+            <input type="hidden" name="signature_b64" id="sig-b64-reponse">
+            <div id="sig-preview-reponse" style="display:none; margin-top:12px; padding:10px 14px; background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; align-items:center; gap:12px;">
+              <img id="sig-preview-img-reponse" src="" alt="Aperçu signature"
+                   style="max-height:48px; max-width:140px; object-fit:contain; background:#fff; border:1px solid #e2e8f0; border-radius:3px; padding:2px;">
+              <span style="font-size:12px; color:#134e3a; font-weight:600;">✓ Signature prête</span>
+              <button type="button" class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="reinitSignatureReponse()">Changer</button>
+            </div>
+          </div>
 
           <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
             <a href="{% url 'justiciables:significations' %}" class="btn btn-ghost">Annuler</a>
@@ -201,5 +263,182 @@ function handleDrop(event) {
     }
   }
 }
+
+/* ── Signature (pad + import, mobile-friendly) ── */
+var signatureReponseOk = false;
+
+function switchTabSig(tab) {
+  var tabDessin = document.getElementById('tab-dessin-sig');
+  var tabImport = document.getElementById('tab-import-sig');
+  var panelDessin = document.getElementById('panel-dessin-sig');
+  var panelImport = document.getElementById('panel-import-sig');
+  if (tab === 'dessin') {
+    if (tabDessin) { tabDessin.style.background = 'var(--primary)'; tabDessin.style.color = '#fff'; }
+    if (tabImport) { tabImport.style.background = '#fff'; tabImport.style.color = 'var(--text-secondary)'; }
+    if (panelDessin) panelDessin.style.display = 'block';
+    if (panelImport) panelImport.style.display = 'none';
+  } else {
+    if (tabImport) { tabImport.style.background = 'var(--primary)'; tabImport.style.color = '#fff'; }
+    if (tabDessin) { tabDessin.style.background = '#fff'; tabDessin.style.color = 'var(--text-secondary)'; }
+    if (panelImport) panelImport.style.display = 'block';
+    if (panelDessin) panelDessin.style.display = 'none';
+  }
+}
+
+function majEtatSignature(ok) {
+  signatureReponseOk = ok;
+  var preview = document.getElementById('sig-preview-reponse');
+  if (preview) preview.style.display = ok ? 'flex' : 'none';
+  validerFormReponse();
+}
+
+function validerFormReponse() {
+  var btn = document.getElementById('btn-envoyer');
+  var textarea = document.getElementById('texte_reponse');
+  if (!btn || !textarea) return;
+  var texteOk = textarea.value.trim().length >= 10;
+  btn.disabled = texteOk && !signatureReponseOk;
+  btn.style.opacity = btn.disabled ? '0.55' : '1';
+  btn.title = btn.disabled ? 'Aposez votre signature pour envoyer' : '';
+}
+
+function reinitSignatureReponse() {
+  var b64Input = document.getElementById('sig-b64-reponse');
+  if (b64Input) b64Input.value = '';
+  var status = document.getElementById('sig-status-reponse');
+  if (status) { status.textContent = 'Aucune signature'; status.style.color = 'var(--text-secondary)'; }
+  effacerSignatureReponse();
+  majEtatSignature(false);
+}
+
+function effacerSignatureReponse() {
+  var canvas = document.getElementById('sig-canvas-reponse');
+  if (canvas) {
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  var b64Input = document.getElementById('sig-b64-reponse');
+  if (b64Input) b64Input.value = '';
+  var placeholder = document.getElementById('sig-placeholder-reponse');
+  if (placeholder) placeholder.style.display = 'flex';
+  var status = document.getElementById('sig-status-reponse');
+  if (status) { status.textContent = 'Aucune signature'; status.style.color = 'var(--text-secondary)'; }
+  majEtatSignature(false);
+}
+
+function importerSignatureReponse(input) {
+  if (!input.files || !input.files[0]) return;
+  var f = input.files[0];
+  if (f.size > 500 * 1024) {
+    alert('L\'image ne doit pas dépasser 500 Ko.');
+    input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var data = e.target.result;
+    var b64Input = document.getElementById('sig-b64-reponse');
+    if (b64Input) b64Input.value = data;
+    var img = document.getElementById('sig-preview-img-reponse');
+    if (img) img.src = data;
+    var status = document.getElementById('sig-status-reponse');
+    if (status) { status.textContent = '✓ Signature importée'; status.style.color = 'var(--primary)'; }
+    majEtatSignature(true);
+  };
+  reader.readAsDataURL(f);
+}
+
+(function() {
+  var canvas = document.getElementById('sig-canvas-reponse');
+  var textarea = document.getElementById('texte_reponse');
+  if (!canvas) return;
+
+  var ctx = canvas.getContext('2d');
+  var drawing = false;
+  var lastX = 0, lastY = 0;
+  var placeholder = document.getElementById('sig-placeholder-reponse');
+  var status = document.getElementById('sig-status-reponse');
+  var b64Input = document.getElementById('sig-b64-reponse');
+
+  function resizeCanvas() {
+    var rect = canvas.getBoundingClientRect();
+    var ratio = window.devicePixelRatio || 1;
+    var prev = canvas.width > 0 ? canvas.toDataURL() : '';
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(ratio, ratio);
+    ctx.strokeStyle = '#1a1a3e';
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (prev && prev.length > 100) {
+      var img = new Image();
+      img.onload = function() { ctx.drawImage(img, 0, 0, rect.width, rect.height); };
+      img.src = prev;
+    }
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  function getPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    var src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  }
+
+  function startDraw(e) {
+    e.preventDefault();
+    drawing = true;
+    var p = getPos(e);
+    lastX = p.x; lastY = p.y;
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    if (placeholder) placeholder.style.display = 'none';
+  }
+  function draw(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    var p = getPos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  }
+  function stopDraw(e) {
+    if (!drawing) return;
+    drawing = false;
+    ctx.closePath();
+    var data = canvas.toDataURL('image/png');
+    if (b64Input) b64Input.value = data;
+    var img = document.getElementById('sig-preview-img-reponse');
+    if (img) img.src = data;
+    if (status) { status.textContent = '✓ Signature enregistrée'; status.style.color = 'var(--primary)'; }
+    majEtatSignature(true);
+  }
+
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDraw);
+  canvas.addEventListener('mouseleave', stopDraw);
+  canvas.addEventListener('touchstart', startDraw, { passive: false });
+  canvas.addEventListener('touchmove', draw, { passive: false });
+  canvas.addEventListener('touchend', stopDraw);
+
+  if (textarea) {
+    textarea.addEventListener('input', validerFormReponse);
+    validerFormReponse();
+  }
+
+  var form = document.getElementById('form-reponse');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      var texteOk = textarea && textarea.value.trim().length >= 10;
+      if (texteOk && !signatureReponseOk) {
+        e.preventDefault();
+        alert('Veuillez apposer votre signature avant d\'envoyer votre réponse.');
+      }
+    });
+  }
+})();
 </script>
 {% endblock %}

@@ -123,6 +123,7 @@ class ReponseJusticiable(models.Model):
     hash_reponse = models.CharField(max_length=64, blank=True)
     nom_fichier_annexe = models.CharField(max_length=255, blank=True)
     hash_annexe = models.CharField(max_length=64, blank=True)
+    signature_justiciable_b64 = models.TextField(blank=True, verbose_name="Signature visuelle du justiciable")
     hash_merkle = models.CharField(max_length=64, blank=True)
     chemin_merkle = models.JSONField(default=list, blank=True)
     horodatage_certigna = models.BinaryField(null=True, blank=True)

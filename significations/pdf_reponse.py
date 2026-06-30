@@ -1,4 +1,6 @@
 """Génération du PDF officiel de réponse du justiciable."""
+import base64
+import hashlib
 import io
 import os
 
@@ -6,6 +8,71 @@ from django.utils import timezone as tz_util
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader, simpleSplit
 from reportlab.pdfgen import canvas
+
+PREFIXES_IMAGE_SIGNATURE = (
+    'data:image/png;base64,',
+    'data:image/jpeg;base64,',
+    'data:image/jpg;base64,',
+    'data:image/svg+xml;base64,',
+    'data:image/webp;base64,',
+    'data:image/gif;base64,',
+)
+
+
+def _signature_b64_valide(b64: str) -> bool:
+    return bool(b64 and any(b64.startswith(p) for p in PREFIXES_IMAGE_SIGNATURE))
+
+
+def _image_reader_depuis_b64(b64: str):
+    """Convertit une data-URL image en ImageReader ReportLab."""
+    from PIL import Image as PilImage
+
+    b64_data = b64.split(',', 1)[1]
+    img_bytes = base64.b64decode(b64_data)
+    pil_img = PilImage.open(io.BytesIO(img_bytes))
+    if pil_img.mode != 'RGBA':
+        pil_img = pil_img.convert('RGBA')
+    bg = PilImage.new('RGBA', pil_img.size, (255, 255, 255, 255))
+    bg.paste(pil_img, mask=pil_img.split()[3])
+    sig_buf = io.BytesIO()
+    bg.convert('RGB').save(sig_buf, format='PNG')
+    sig_buf.seek(0)
+    return ImageReader(sig_buf)
+
+
+def _dessiner_bloc_signature(c, w, y, b64, label, nom_sous_sig, sig_w=180, sig_h=60):
+    """Dessine le cadre de signature sur le canvas. Retourne y après le bloc."""
+    sig_x = w - 40 - sig_w
+    pad = 6
+    frame_h = sig_h + pad * 2
+    min_y = 130
+
+    if y - frame_h - 30 < min_y:
+        c.showPage()
+        y = A4[1] - 60
+
+    c.setFillColorRGB(0.10, 0.24, 0.43)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(sig_x, y, label)
+    y -= 14
+
+    frame_y = y - frame_h
+    try:
+        sig_img = _image_reader_depuis_b64(b64)
+        c.setStrokeColorRGB(0.10, 0.24, 0.43)
+        c.setLineWidth(0.8)
+        c.rect(sig_x - 4, frame_y, sig_w + 8, frame_h, stroke=1, fill=0)
+        c.drawImage(sig_img, sig_x, frame_y + pad, width=sig_w, height=sig_h,
+                    preserveAspectRatio=True, mask='auto')
+    except Exception:
+        c.setStrokeColorRGB(0.10, 0.24, 0.43)
+        c.setLineWidth(0.8)
+        c.rect(sig_x - 4, frame_y, sig_w + 8, frame_h, stroke=1, fill=0)
+
+    c.setFont("Helvetica-Oblique", 7)
+    c.setFillColorRGB(0.3, 0.3, 0.3)
+    c.drawCentredString(sig_x + sig_w / 2, frame_y - 10, nom_sous_sig)
+    return frame_y - 22
 
 
 def fusionner_annexe_pdf(pdf_principal: bytes, pdf_annexe: bytes) -> bytes:
@@ -170,6 +237,14 @@ def generer_pdf_reponse(
 
     y = min(y_texte - 10, corps_bas - 10)
 
+    signature_b64 = getattr(reponse, 'signature_justiciable_b64', '') or ''
+    if _signature_b64_valide(signature_b64):
+        y = _dessiner_bloc_signature(
+            c, w, y, signature_b64,
+            label="Signature du justiciable :",
+            nom_sous_sig=justiciable.nom_complet[:60],
+        )
+
     if reponse.hash_contenu or signification.hash_acte:
         c.setStrokeColorRGB(0.8, 0.8, 0.8)
         c.setLineWidth(0.5)
@@ -186,6 +261,14 @@ def generer_pdf_reponse(
         if reponse.hash_contenu:
             c.drawString(40, y, f"Hash contenu (SHA-256) : {reponse.hash_contenu}")
             y -= 12
+        if _signature_b64_valide(signature_b64):
+            try:
+                sig_hash = base64.b64decode(signature_b64.split(',', 1)[1])
+                hash_sig = hashlib.sha256(sig_hash).hexdigest()
+                c.drawString(40, y, f"Hash signature (SHA-256) : {hash_sig[:48]}...")
+                y -= 12
+            except Exception:
+                pass
         if signification.hash_acte:
             hash_acte = signification.hash_acte
             c.drawString(40, y, f"Hash acte signifie : {hash_acte[:48]}...")
