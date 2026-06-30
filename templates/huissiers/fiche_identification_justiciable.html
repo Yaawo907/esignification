@@ -1,0 +1,229 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fiche d'identification — {{ justiciable.nom_complet }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #1a1a1a;
+    background: #eef1f6;
+    line-height: 1.45;
+  }
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid #dde2ea;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .btn-primary { background: #1a3c6e; color: #fff; }
+  .btn-primary:hover { background: #142f57; }
+  .btn-ghost { background: #f0f2f7; color: #333; border: 1px solid #dde2ea; }
+  .btn-ghost:hover { background: #e8ebf2; }
+
+  .page {
+    max-width: 210mm;
+    margin: 24px auto;
+    background: #fff;
+    border: 1px solid #dde2ea;
+    box-shadow: 0 4px 24px rgba(0,0,0,.08);
+    padding: 18mm 16mm;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid #1a3c6e;
+    margin-bottom: 22px;
+  }
+  .header-left { flex: 1; }
+  .platform {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #5a6478;
+    margin-bottom: 4px;
+  }
+  .title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a3c6e;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: #5a6478;
+  }
+  .header-right {
+    text-align: right;
+    font-size: 11px;
+    color: #5a6478;
+    min-width: 160px;
+  }
+  .header-right strong { color: #1a1a1a; display: block; font-size: 12px; margin-bottom: 2px; }
+
+  .section {
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #1a3c6e;
+    border-bottom: 1px solid #dde2ea;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 7px 14px;
+    font-size: 13px;
+  }
+  .label {
+    color: #5a6478;
+    font-weight: 600;
+  }
+  .value { color: #1a1a1a; }
+  .value.mono { font-family: Consolas, monospace; font-size: 12px; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-ok { background: #e6f4ec; color: #134e3a; border: 1px solid #a8d5bc; }
+
+  .footer {
+    margin-top: 28px;
+    padding-top: 14px;
+    border-top: 1px solid #dde2ea;
+    font-size: 10px;
+    color: #7a8494;
+    text-align: center;
+  }
+  .footer p + p { margin-top: 4px; }
+
+  @media print {
+    body { background: #fff; }
+    .toolbar { display: none !important; }
+    .page {
+      margin: 0;
+      border: none;
+      box-shadow: none;
+      max-width: none;
+      padding: 12mm 10mm;
+    }
+    @page { size: A4; margin: 10mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button type="button" class="btn btn-primary" onclick="window.print()">🖨 Imprimer la fiche</button>
+  <button type="button" class="btn btn-ghost" onclick="window.close()">Fermer</button>
+</div>
+
+<div class="page">
+  <header class="header">
+    <div class="header-left">
+      <div class="platform">{{ config.nom_plateforme|default:"e-Signification Bénin" }}</div>
+      <h1 class="title">Fiche d'identification du justiciable</h1>
+      <p class="subtitle">Document de référence pour dossier physique — domicile électronique vérifié</p>
+    </div>
+    <div class="header-right">
+      <strong>Me {{ huissier.prenom }} {{ huissier.nom }}</strong>
+      {{ huissier.nom_etude }}
+      {% if huissier.telephone %}<br>{{ huissier.telephone }}{% endif %}
+      <br><br>
+      Édité le {{ date_edition|date:"d/m/Y" }} à {{ date_edition|date:"H:i" }}
+    </div>
+  </header>
+
+  <section class="section">
+    <h2 class="section-title">Identité</h2>
+    <div class="grid">
+      <div class="label">Type de compte</div>
+      <div class="value">
+        {% if justiciable.type_compte == 'entreprise' %}Entreprise{% else %}Particulier{% endif %}
+      </div>
+
+      {% if justiciable.type_compte == 'entreprise' %}
+      <div class="label">Raison sociale</div>
+      <div class="value"><strong>{{ justiciable.nom_entreprise|default:justiciable.nom }}</strong></div>
+      {% if justiciable.prenom or justiciable.nom %}
+      <div class="label">Représentant</div>
+      <div class="value">{% if justiciable.prenom %}{{ justiciable.prenom }} {% endif %}{{ justiciable.nom }}</div>
+      {% endif %}
+      {% else %}
+      <div class="label">Nom complet</div>
+      <div class="value"><strong>{% if justiciable.prenom %}{{ justiciable.prenom }} {% endif %}{{ justiciable.nom }}</strong></div>
+      {% endif %}
+
+      <div class="label">NPI</div>
+      <div class="value mono">{{ justiciable.npi|default:"—" }}</div>
+
+      <div class="label">IFU</div>
+      <div class="value mono">{{ justiciable.ifu|default:"—" }}</div>
+
+      <div class="label">Adresse</div>
+      <div class="value">{{ justiciable.adresse|default:"—"|linebreaksbr }}</div>
+
+      <div class="label">Téléphone</div>
+      <div class="value">{{ justiciable.telephone|default:"—" }}</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Domicile électronique</h2>
+    <div class="grid">
+      <div class="label">Email d'élection</div>
+      <div class="value"><strong>{{ justiciable.email_domicile }}</strong></div>
+
+      <div class="label">Statut</div>
+      <div class="value"><span class="badge badge-ok">✓ Domicile vérifié</span></div>
+
+      <div class="label">Inscrit le</div>
+      <div class="value">{{ justiciable.date_creation|date:"d/m/Y" }}</div>
+
+      <div class="label">Référence plateforme</div>
+      <div class="value mono">{{ justiciable.uuid }}</div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>Document établi par <strong>{{ huissier.nom_etude }}</strong> via {{ config.nom_plateforme|default:"e-Signification Bénin" }}.</p>
+    <p>Usage interne — à joindre au dossier physique du justiciable. Les informations proviennent du registre électronique vérifié de la plateforme.</p>
+  </footer>
+</div>
+
+</body>
+</html>

@@ -166,11 +166,20 @@
 
                   <!-- Action -->
                   <td style="text-align:right;">
-                    <a href="{% url 'significations:envoyer' %}?justiciable={{ j.uuid }}"
-                      class="btn btn-sm btn-primary spinner-link"
-                      title="Envoyer une signification à ce justiciable">
-                      ✉ Signifier
-                    </a>
+                    <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center; flex-wrap:wrap;">
+                      <a href="{% url 'huissiers:fiche_justiciable' j.uuid %}"
+                        class="btn btn-sm btn-ghost"
+                        target="_blank"
+                        rel="noopener"
+                        title="Imprimer la fiche d'identification pour le dossier physique">
+                        🖨 Fiche
+                      </a>
+                      <a href="{% url 'significations:envoyer' %}?justiciable={{ j.uuid }}"
+                        class="btn btn-sm btn-primary spinner-link"
+                        title="Envoyer une signification à ce justiciable">
+                        ✉ Signifier
+                      </a>
+                    </div>
                   </td>
                 </tr>
                 {% endfor %}

@@ -177,13 +177,24 @@
                     </td>
                     <td style="text-align:right;">
                       {% if not inv.utilise %}
-                      <button class="btn btn-xs btn-blue btn-renvoyer-inv"
-                        data-url="{% url 'huissiers:renvoyer_invitation' inv.uuid %}"
-                        data-uuid="{{ inv.uuid }}"
-                        data-email="{{ inv.email_cible }}"
-                        title="Renvoyer l'invitation">
-                        ↻ Renvoyer
-                      </button>
+                      <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
+                        <button class="btn btn-xs btn-blue btn-renvoyer-inv"
+                          data-url="{% url 'huissiers:renvoyer_invitation' inv.uuid %}"
+                          data-uuid="{{ inv.uuid }}"
+                          data-email="{{ inv.email_cible }}"
+                          title="Renvoyer l'invitation">
+                          ↻ Renvoyer
+                        </button>
+                        {% if inv.date_expiration >= now %}
+                        <button class="btn btn-xs btn-red btn-supprimer-invitation"
+                          data-url="{% url 'huissiers:supprimer_invitation' inv.uuid %}"
+                          data-uuid="{{ inv.uuid }}"
+                          data-email="{{ inv.email_cible }}"
+                          title="Supprimer cette invitation">
+                          🗑
+                        </button>
+                        {% endif %}
+                      </div>
                       {% else %}
                       <span style="font-size:11px; color:var(--text-light);">—</span>
                       {% endif %}
@@ -310,6 +321,47 @@
     if (existing) existing.remove();
   }
 })();
+
+
+/* ── Supprimer une invitation en attente (AJAX) ── */
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-supprimer-invitation');
+  if (!btn) return;
+
+  const url = btn.dataset.url;
+  const uuid = btn.dataset.uuid;
+  const email = btn.dataset.email || '';
+  const row = document.getElementById('inv-row-' + uuid);
+
+  if (!confirm('Supprimer l\'invitation pour ' + email + ' ?\nLe lien d\'activation ne sera plus utilisable.')) {
+    return;
+  }
+
+  if (row) row.classList.add('row-loading');
+  btn.disabled = true;
+
+  fetchSecure(url, { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (row) row.classList.remove('row-loading');
+      if (data.success) {
+        if (row) {
+          row.style.transition = 'opacity .3s';
+          row.style.opacity = '0';
+          setTimeout(function() { row.remove(); }, 300);
+        }
+        showToast(data.message, 'success');
+      } else {
+        btn.disabled = false;
+        showToast('Erreur : ' + (data.error || 'Impossible de supprimer.'), 'error');
+      }
+    })
+    .catch(function() {
+      if (row) row.classList.remove('row-loading');
+      btn.disabled = false;
+      showToast('Erreur réseau. Veuillez réessayer.', 'error');
+    });
+});
 
 
 /* ── Renvoyer une invitation (AJAX) ── */

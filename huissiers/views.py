@@ -75,6 +75,32 @@ def rechercher_justiciable(request):
 
 @login_required
 @huissier_required
+def fiche_identification_justiciable(request, uuid):
+    from justiciables.models import ProfilJusticiable
+    from django.utils import timezone
+
+    huissier = _get_huissier(request)
+    justiciable = get_object_or_404(
+        ProfilJusticiable.objects.select_related('user'),
+        uuid=uuid,
+        email_domicile_verifie=True,
+    )
+    from securite.audit import journaliser
+    journaliser(
+        request.user, 'fiche_justiciable_imprimee', 'ProfilJusticiable',
+        justiciable.uuid,
+        description=f"Fiche d'identification — {justiciable.nom_complet}",
+        request=request,
+    )
+    return render(request, 'huissiers/fiche_identification_justiciable.html', {
+        'justiciable': justiciable,
+        'huissier': huissier,
+        'date_edition': timezone.localtime(timezone.now()),
+    })
+
+
+@login_required
+@huissier_required
 def liste_significations(request):
     from django.core.paginator import Paginator
     huissier = (request.user.profil_huissier if request.user.role == User.HUISSIER
@@ -244,6 +270,51 @@ def renvoyer_invitation_justiciable(request, uuid):
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
         messages.error(request, "Erreur lors du renvoi de l'invitation.")
 
+    return redirect('huissiers:inviter')
+
+
+@login_required
+@huissier_required
+@require_http_methods(["POST"])
+def supprimer_invitation_justiciable(request, uuid):
+    from django.contrib import messages
+    from justiciables.models import InvitationJusticiable
+    from accounts.models import TokenActivation
+
+    huissier = (request.user.profil_huissier if request.user.role == User.HUISSIER
+                else request.user.profil_clerc.huissier)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    invitation = get_object_or_404(InvitationJusticiable, uuid=uuid, huissier=huissier)
+
+    if invitation.utilise:
+        msg = 'Cette invitation a déjà été utilisée.'
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': msg}, status=400)
+        messages.error(request, msg)
+        return redirect('huissiers:inviter')
+
+    email = invitation.email_cible
+    TokenActivation.objects.filter(
+        token=invitation.token,
+        type_token=TokenActivation.INVITATION_JUSTICIABLE,
+        utilise=False,
+    ).update(utilise=True)
+    invitation.delete()
+
+    from securite.audit import journaliser
+    journaliser(
+        request.user, 'invitation_justiciable_supprimee', 'InvitationJusticiable',
+        uuid, description=f"Invitation annulée pour {email}", request=request,
+    )
+
+    if is_ajax:
+        return JsonResponse({
+            'success': True,
+            'message': f"Invitation supprimée pour {email}.",
+            'row_id': str(uuid),
+        })
+    messages.success(request, f"Invitation supprimée pour {email}.")
     return redirect('huissiers:inviter')
 
 
