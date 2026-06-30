@@ -91,10 +91,21 @@ def envoyer_signification(request):
         from administration.models import ConfigurationPlateforme as _CP
         yousign_actif = _CP.get().yousign_active
 
+        placement_yousign = None
         if yousign_actif:
             from notifications.sms import normaliser_telephone_yousign
+            from .yousign_placement import extraire_placement_post, valider_placement_yousign
             try:
                 normaliser_telephone_yousign(huissier.telephone)
+            except ValueError as exc:
+                from django.contrib import messages
+                messages.error(request, str(exc))
+                return redirect(request.path)
+            try:
+                placement_yousign = valider_placement_yousign(
+                    contenu,
+                    extraire_placement_post(request.POST),
+                )
             except ValueError as exc:
                 from django.contrib import messages
                 messages.error(request, str(exc))
@@ -124,7 +135,7 @@ def envoyer_signification(request):
             # L'acte n'est PAS encore envoyé au justiciable.
             # Yousign envoie un lien par email ; l'OTP SMS autorise la signature.
             # Dès que l'huissier signe, le webhook déclenche l'envoi au justiciable.
-            yousign_ok, yousign_err = _lancer_yousign_si_actif(sig, contenu)
+            yousign_ok, yousign_err = _lancer_yousign_si_actif(sig, contenu, placement_yousign)
             if yousign_ok:
                 journaliser(request.user, 'signification_attente_signature_yousign',
                             'Signification', sig.uuid, request=request)
@@ -177,6 +188,7 @@ def envoyer_signification(request):
         'credit_retour_refus': credit_debit_envoi() - cout_net_apres_refus(),
         'credit_retour_annulation': credit_debit_envoi() - cout_net_apres_annulation(),
         'prix_credit_fcfa': config.prix_credit_fcfa,
+        'yousign_actif': config.yousign_active,
     })
 
 
@@ -740,7 +752,7 @@ def synchroniser_signification_yousign(sig):
     return False, f"Signature Yousign en cours (statut API : {statut_ys or 'inconnu'})."
 
 
-def _lancer_yousign_si_actif(signification, pdf_bytes) -> tuple[bool, str]:
+def _lancer_yousign_si_actif(signification, pdf_bytes, placement=None) -> tuple[bool, str]:
     """
     Lance la demande de signature Yousign pour l'huissier.
     Retourne (True, '') si succès, (False, message) si erreur bloquante,
@@ -750,7 +762,7 @@ def _lancer_yousign_si_actif(signification, pdf_bytes) -> tuple[bool, str]:
     logger = logging.getLogger(__name__)
     try:
         from .yousign_service import creer_demande_signature
-        sig_req_id = creer_demande_signature(signification, pdf_bytes)
+        sig_req_id = creer_demande_signature(signification, pdf_bytes, placement=placement)
         journaliser(None, 'yousign_demande_creee', 'Signification', signification.uuid,
                     description=f"Signature request Yousign : {sig_req_id}")
         return True, ''

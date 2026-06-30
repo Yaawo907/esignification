@@ -1,4 +1,5 @@
 ﻿{% extends 'base/base.html' %}
+{% load static %}
 {% block title %}Nouvelle signification{% endblock %}
 {% block body_class %}dashboard-page{% endblock %}
 
@@ -45,7 +46,7 @@
       </div>
     </header>
 
-    <div class="content-area" style="max-width:680px;">
+    <div class="content-area" style="max-width:{% if yousign_actif %}920px{% else %}680px{% endif %};">
 
       {% if messages %}
       {% for msg in messages %}
@@ -220,10 +221,51 @@
           <p class="form-hint" style="margin-top:2px; margin-left:22px;">Si coché, le justiciable pourra joindre un document de réponse depuis son espace.</p>
         </div>
 
+        {% if yousign_actif %}
+        <!-- Emplacement signature Yousign -->
+        <div class="card" id="yousign-placement-section" style="margin-bottom:16px; padding:20px 24px; display:none;">
+          <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">
+            3 · Emplacement de la signature électronique (Yousign) <span style="color:#e53e3e;">*</span>
+          </div>
+          <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
+            Parcourez les pages du PDF et <strong>cliquez à l'endroit</strong> où vous souhaitez apposer votre signature électronique.
+            Un cadre vert indique l'emplacement retenu.
+          </p>
+
+          <input type="hidden" name="yousign_sig_page" id="yousign_sig_page" value="">
+          <input type="hidden" name="yousign_sig_x" id="yousign_sig_x" value="">
+          <input type="hidden" name="yousign_sig_y" id="yousign_sig_y" value="">
+          <input type="hidden" name="yousign_sig_width" id="yousign_sig_width" value="120">
+          <input type="hidden" name="yousign_sig_height" id="yousign_sig_height" value="60">
+
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn btn-ghost btn-sm" id="yousign-page-prev" disabled aria-label="Page précédente">←</button>
+              <span id="yousign-page-info" style="font-size:13px; font-weight:600; min-width:100px; text-align:center;">—</span>
+              <button type="button" class="btn btn-ghost btn-sm" id="yousign-page-next" disabled aria-label="Page suivante">→</button>
+            </div>
+            <span id="yousign-placement-status" style="font-size:12px; color:var(--text-secondary);">Cliquez sur le document pour placer votre signature électronique.</span>
+          </div>
+
+          <div id="yousign-pdf-loading" style="display:none; padding:24px; text-align:center; font-size:13px; color:var(--text-secondary);">
+            Chargement de l'aperçu PDF…
+          </div>
+
+          <div id="yousign-pdf-wrap" class="yousign-pdf-wrap">
+            <div id="yousign-pdf-inner" class="yousign-pdf-inner">
+              <canvas id="yousign-pdf-canvas" class="yousign-pdf-canvas" aria-label="Aperçu du PDF — cliquez pour placer la signature"></canvas>
+              <div id="yousign-sig-marker" class="yousign-sig-marker" style="display:none;" aria-hidden="true">
+                <span>Signature</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
         <!-- Signature numérique -->
         <div class="card" style="margin-bottom:16px; padding:20px 24px;">
           <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;">
-            3 · Signature numérique <span style="color:#e53e3e;">*</span>
+            {% if yousign_actif %}4{% else %}3{% endif %} · Signature numérique <span style="color:#e53e3e;">*</span>
           </div>
 
           {% if params_sig and params_sig.signature_simple_b64 or params_sig and params_sig.signature_cachet_b64 or params_sig and params_sig.cachet_simple_b64 %}
@@ -339,6 +381,45 @@
   background: #f0fdf4;
   box-shadow: 0 0 0 3px rgba(21,128,61,.12);
 }
+.yousign-pdf-wrap {
+  position: relative;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: #f8fafc;
+  overflow: auto;
+  max-height: 70vh;
+  padding: 8px;
+  text-align: center;
+}
+.yousign-pdf-inner {
+  position: relative;
+  display: inline-block;
+}
+.yousign-pdf-canvas {
+  display: block;
+  margin: 0 auto;
+  cursor: crosshair;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  background: #fff;
+}
+.yousign-sig-marker {
+  position: absolute;
+  border: 2px dashed #15803d;
+  background: rgba(21, 128, 61, 0.12);
+  border-radius: 4px;
+  pointer-events: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.yousign-sig-marker span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #15803d;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
 </style>
 {% endblock %}
 
@@ -349,6 +430,8 @@
 var justiciableSelectionne = {% if justiciable %}true{% else %}false{% endif %};
 var fichierSelectionne = false;
 var signatureApposee = false;
+var yousignActif = {% if yousign_actif %}true{% else %}false{% endif %};
+var placementYousignOk = !yousignActif;
 
 /* Activer/désactiver le bouton Envoyer */
 function validerFormulaire() {
@@ -356,6 +439,7 @@ function validerFormulaire() {
   var recap = document.getElementById('recap-envoi');
   if (!btn) return;
   var ok = justiciableSelectionne && fichierSelectionne && signatureApposee;
+  if (yousignActif) ok = ok && placementYousignOk;
   btn.disabled = !ok;
   btn.style.opacity = ok ? '1' : '.5';
   btn.style.cursor = ok ? 'pointer' : 'not-allowed';
@@ -573,4 +657,19 @@ function afficherNomFichier(input) {
 
 validerFormulaire();
 </script>
+{% if yousign_actif %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="{% static 'js/pdf-placement-yousign.js' %}?v=1"></script>
+<script>
+'use strict';
+if (window.YousignPdfPlacement) {
+  YousignPdfPlacement.init({
+    onChange: function (hasPlacement) {
+      placementYousignOk = hasPlacement;
+      validerFormulaire();
+    }
+  });
+}
+</script>
+{% endif %}
 {% endblock %}

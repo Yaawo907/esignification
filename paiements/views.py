@@ -54,7 +54,9 @@ def achat_credits(request):
     huissier = _huissier_utilisateur(request.user)
     config = __import__('administration.models', fromlist=['ConfigurationPlateforme']).ConfigurationPlateforme.get()
     solde = get_solde(huissier)
-    mouvements = huissier.mouvements_credits.all()[:20]
+    mouvements = huissier.mouvements_credits.select_related(
+        'signification', 'signification__justiciable',
+    ).all()[:20]
     commandes = huissier.commandes_credits.all()[:10]
 
     if request.method == 'POST':

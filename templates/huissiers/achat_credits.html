@@ -21,7 +21,7 @@ kkiapay-widget, [id*="kkiapay"], iframe[src*="kkiapay"] { z-index: 9000 !importa
       </div>
     </header>
 
-    <div class="content-area" style="max-width:720px;">
+    <div class="content-area" style="max-width:960px;">
       {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'success' }}" style="margin-bottom:12px;">{{ m }}</div>{% endfor %}{% endif %}
 
       <div class="card credit-solde-card" style="margin-bottom:20px;padding:20px 24px;display:flex;align-items:center;gap:16px;
@@ -61,14 +61,42 @@ kkiapay-widget, [id*="kkiapay"], iframe[src*="kkiapay"] { z-index: 9000 !importa
       {% if mouvements %}
       <div class="card">
         <div class="card-header"><span class="card-title">Historique</span></div>
-        <div class="card-body" style="padding:0;">
+        <div class="card-body" style="padding:0;overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Solde</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Justiciable</th>
+                <th>Acte</th>
+                <th>Montant</th>
+                <th>Solde</th>
+              </tr>
+            </thead>
             <tbody>
               {% for m in mouvements %}
               <tr>
                 <td>{{ m.date|date:"d/m/Y H:i" }}</td>
                 <td>{{ m.get_type_mouvement_display }}</td>
+                <td>
+                  {% if m.signification %}
+                    <div class="td-name">{{ m.signification.justiciable.nom_complet }}</div>
+                  {% else %}
+                    <span style="color:var(--text-light);">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if m.signification %}
+                    {% if m.signification.nom_fichier_original %}
+                    <div class="td-name" style="font-size:13px;">{{ m.signification.nom_fichier_original }}</div>
+                    <div class="td-sub" style="font-family:monospace;font-size:11px;">{{ m.signification.reference }}</div>
+                    {% else %}
+                    <div class="td-name" style="font-family:monospace;font-size:12px;">{{ m.signification.reference }}</div>
+                    {% endif %}
+                  {% else %}
+                    <span style="color:var(--text-light);">—</span>
+                  {% endif %}
+                </td>
                 <td>{% if m.montant > 0 %}+{% endif %}{{ m.montant }}</td>
                 <td>{{ m.solde_apres }}</td>
               </tr>

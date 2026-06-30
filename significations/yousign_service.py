@@ -146,12 +146,28 @@ def _expiration_date():
     return (datetime.now(tz=timezone.utc) + timedelta(days=7)).strftime('%Y-%m-%d')
 
 
-def creer_demande_signature(signification, pdf_bytes):
+def creer_demande_signature(signification, pdf_bytes, placement=None):
     """
     Cree une demande de signature Yousign pour l acte.
     Retourne le signature_request_id.
     Met a jour signification.yousign_signature_request_id et yousign_statut.
+
+    placement : dict optionnel {page, x, y, width, height} en points PDF
+    (origine haut-gauche, comme l API Yousign v3).
     """
+    from .yousign_placement import (
+        YOUSIGN_SIG_WIDTH_DEFAULT,
+        YOUSIGN_SIG_HEIGHT_DEFAULT,
+    )
+
+    if placement is None:
+        placement = {
+            'page': 1,
+            'x': 360,
+            'y': 680,
+            'width': YOUSIGN_SIG_WIDTH_DEFAULT,
+            'height': YOUSIGN_SIG_HEIGHT_DEFAULT,
+        }
     from notifications.sms import normaliser_telephone_yousign
 
     api_key, mode = _get_config()
@@ -208,11 +224,11 @@ def creer_demande_signature(signification, pdf_bytes):
                 {
                     'type': 'signature',
                     'document_id': doc_id,
-                    'page': 1,
-                    'x': 360,
-                    'y': 680,
-                    'width': 120,
-                    'height': 60,
+                    'page': placement['page'],
+                    'x': placement['x'],
+                    'y': placement['y'],
+                    'width': placement['width'],
+                    'height': placement['height'],
                 }
             ],
         },
