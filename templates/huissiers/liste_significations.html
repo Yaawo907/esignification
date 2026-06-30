@@ -103,7 +103,7 @@
                   {% if sig.statut == 'acceptee' or sig.statut == 'repondu' %}
                     {% if sig.date_acceptation %}
                     <div class="td-sub" style="margin-top:3px;">
-                      Reçu le {{ sig.date_acceptation|date:"d/m/Y" }}
+                      Reçu le {{ sig.date_acceptation|date:"d/m/Y H:i:s" }}
                     </div>
                     {% endif %}
                   {% endif %}
