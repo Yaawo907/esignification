@@ -55,5 +55,5 @@ psycopg2-binary==2.9.10
 # OPTIONNEL — Intégrations tierces
 # ============================================================
 
-# Client HTTP (appels YouSign, Certigna)
-# requests==2.32.3
+# Client HTTP (YouSign, Certigna, vérification Kkiapay côté serveur)
+requests==2.32.3

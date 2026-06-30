@@ -1,5 +1,5 @@
 ﻿{% extends 'base/base.html' %}
-{% block title %}Mon compte — Administration{% endblock %}
+{% block title %}Mon profil — Administration{% endblock %}
 {% block body_class %}dashboard-page{% endblock %}
 
 {% block body %}
@@ -10,8 +10,8 @@
     <header class="topbar">
       <button class="btn-hamburger" id="btn-hamburger" type="button" aria-label="Ouvrir le menu"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="2" rx="1"/><rect x="1" y="9" width="18" height="2" rx="1"/><rect x="1" y="15" width="18" height="2" rx="1"/></svg></button>
       <div>
-        <h1 class="topbar-title">Sécurité &amp; connexion</h1>
-        <p class="topbar-sub">Modes de vérification et mot de passe du compte administrateur</p>
+        <h1 class="topbar-title">Mon profil</h1>
+        <p class="topbar-sub">Informations personnelles, email de connexion et sécurité du compte</p>
       </div>
     </header>
 
@@ -26,22 +26,95 @@
       {% endfor %}
       {% endif %}
 
+      <!-- Profil personnel -->
       <div class="card" style="margin-bottom:20px; padding:20px 24px;">
-        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:16px;">
-          Compte de connexion
+        <div class="card-section-title">Profil personnel</div>
+
+        {% if form_profil.non_field_errors %}
+        <div class="form-error" role="alert">{{ form_profil.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="profil">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="{{ form_profil.prenom.id_for_label }}">Prénom</label>
+              {{ form_profil.prenom }}
+              {% if form_profil.prenom.errors %}<p class="field-error">{{ form_profil.prenom.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="{{ form_profil.nom.id_for_label }}">Nom *</label>
+              {{ form_profil.nom }}
+              {% if form_profil.nom.errors %}<p class="field-error">{{ form_profil.nom.errors.0 }}</p>{% endif %}
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="{{ form_profil.telephone.id_for_label }}">Téléphone</label>
+            {{ form_profil.telephone }}
+            {% if form_profil.telephone.errors %}<p class="field-error">{{ form_profil.telephone.errors.0 }}</p>{% endif %}
+            <p class="form-hint">Requis pour l'authentification par SMS (OTP), si activée.</p>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+            <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+              Enregistrer le profil
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Email de connexion -->
+      <div class="card" style="margin-bottom:20px; padding:20px 24px;">
+        <div class="card-section-title">Email de connexion</div>
+
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; margin-bottom:18px;">
+          <div style="font-size:11px; color:var(--text-light); margin-bottom:2px;">Adresse actuelle</div>
+          <div style="font-size:15px; font-weight:600;">{{ request.user.email }}</div>
         </div>
-        <div>
-          <div style="font-size:11px; color:var(--text-light); margin-bottom:2px;">Email</div>
-          <div style="font-size:14px; font-weight:500;">{{ request.user.email }}</div>
-        </div>
+
+        {% if erreur_email %}
+        <div class="form-error" role="alert" style="margin-bottom:14px;">{{ erreur_email }}</div>
+        {% endif %}
+
+        <form method="post" novalidate id="form-email">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="changer_email">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="nouveau_email">Nouvelle adresse email *</label>
+              <input type="email" name="nouveau_email" id="nouveau_email" class="form-input"
+                placeholder="nouvelle@adresse.bj" autocomplete="email"
+                value="{{ request.POST.nouveau_email|default:'' }}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="mot_de_passe_email">Mot de passe actuel *</label>
+              <input type="password" name="mot_de_passe" id="mot_de_passe_email" class="form-input"
+                autocomplete="current-password" placeholder="••••••••••">
+            </div>
+          </div>
+
+          <p class="form-hint" style="margin-bottom:12px;">
+            La modification est immédiate. Utilisez la nouvelle adresse pour vos prochaines connexions.
+          </p>
+
+          <div style="display:flex; justify-content:flex-end;">
+            <button type="submit" class="btn btn-primary btn-spinner" data-loading="Mise à jour…"
+              onclick="return confirmerChangementEmail()">
+              Changer l'email
+            </button>
+          </div>
+        </form>
       </div>
 
       {% include 'accounts/_mfa_parametres.html' %}
 
+      <!-- Mot de passe -->
       <div class="card" style="padding:20px 24px;">
-        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:16px;">
-          Changer le mot de passe
-        </div>
+        <div class="card-section-title">Changer le mot de passe</div>
 
         {% if form_mdp.non_field_errors %}
         <div class="form-error" role="alert">{{ form_mdp.non_field_errors }}</div>
@@ -89,4 +162,48 @@
     </div>
   </main>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+(function() {
+  var mdp = document.getElementById('id_nouveau_mdp');
+  var conf = document.getElementById('id_confirmer_mdp');
+  var ruleLength = document.getElementById('mdp-rule-length');
+  var ruleNumeric = document.getElementById('mdp-rule-numeric');
+  var ruleMatch = document.getElementById('mdp-rule-match');
+  if (!mdp || !ruleLength) return;
+  function setRule(el, state) {
+    if (!el) return;
+    el.classList.remove('ok', 'ko');
+    if (state === 'ok') el.classList.add('ok');
+    else if (state === 'ko') el.classList.add('ko');
+  }
+  function verifier() {
+    var val = mdp.value;
+    var confVal = conf ? conf.value : '';
+    var hasInput = val.length > 0;
+    setRule(ruleLength, !hasInput ? null : (val.length >= 10 ? 'ok' : 'ko'));
+    setRule(ruleNumeric, !hasInput ? null : (!/^\d+$/.test(val) ? 'ok' : 'ko'));
+    if (!confVal) setRule(ruleMatch, null);
+    else if (!val) setRule(ruleMatch, 'ko');
+    else setRule(ruleMatch, val === confVal ? 'ok' : 'ko');
+  }
+  mdp.addEventListener('input', verifier);
+  if (conf) conf.addEventListener('input', verifier);
+})();
+
+function confirmerChangementEmail() {
+  var val = document.getElementById('nouveau_email');
+  if (!val || !val.value.trim()) return false;
+  return confirm('Changer l\'email de connexion vers :\n' + val.value.trim() + '\n\nContinuer ?');
+}
+</script>
+<style>
+.card-section-title {
+  font-size: 12px; font-weight: 600; color: var(--text-light);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 16px;
+}
+</style>
 {% endblock %}

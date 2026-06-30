@@ -14,6 +14,7 @@ class Signification(models.Model):
     STATUT_NON_DELIVREE = 'non_delivree'
     STATUT_TRADITIONNELLE = 'traditionnelle'
     STATUT_REPONDU = 'repondu'
+    STATUT_ANNULEE = 'annulee'
 
     STATUT_CHOICES = [
         (STATUT_ATTENTE_SIGNATURE, 'En attente de signature huissier'),
@@ -25,6 +26,7 @@ class Signification(models.Model):
         (STATUT_NON_DELIVREE, 'Non délivrée électroniquement'),
         (STATUT_TRADITIONNELLE, 'Bascule signification traditionnelle'),
         (STATUT_REPONDU, 'Réponse reçue'),
+        (STATUT_ANNULEE, 'Annulée'),
     ]
 
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
@@ -67,6 +69,10 @@ class Signification(models.Model):
         help_text='ID du signataire Yousign (huissier)')
     yousign_audit_trail_chiffre = models.BinaryField(null=True, blank=True,
         help_text='Dossier de preuve Yousign (audit trail PDF chiffré)')
+
+    # Crédits — débit à l'envoi, ajustement selon issue finale
+    credit_debite = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    credit_ajuste = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Signification'

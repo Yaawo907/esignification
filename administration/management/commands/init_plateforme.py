@@ -21,7 +21,7 @@ class Command(BaseCommand):
         self.stdout.write('=== Initialisation de la plateforme e-Signification Bénin ===\n')
 
         # 1. Configuration plateforme
-        from administration.models import ConfigurationPlateforme, ModeleEmail
+        from administration.models import ConfigurationPlateforme, ModeleEmail, TexteLegal
         config = ConfigurationPlateforme.get()
         config.nom_plateforme = 'e-Signification Bénin'
         config.pays = 'Bénin'
@@ -36,6 +36,28 @@ class Command(BaseCommand):
         config.email_contact = options['email']
         config.save()
         self.stdout.write(self.style.SUCCESS('✓ Configuration plateforme créée'))
+
+        # 1b. Textes légaux par défaut (CGU + politique de confidentialité)
+        from pathlib import Path
+        data_dir = Path(__file__).resolve().parent.parent.parent / 'data' / 'fr'
+        textes_defaut = [
+            (TexteLegal.TYPE_CGU, 'Conditions Générales d\'Utilisation', 'cgu.html'),
+            (TexteLegal.TYPE_CONFIDENTIALITE, 'Politique de confidentialité', 'confidentialite.html'),
+            (TexteLegal.TYPE_MENTIONS, 'Mentions légales', 'mentions.html'),
+        ]
+        for type_texte, titre, fichier in textes_defaut:
+            chemin = data_dir / fichier
+            contenu = chemin.read_text(encoding='utf-8') if chemin.exists() else f'<p>{titre} — contenu à compléter.</p>'
+            obj, created = TexteLegal.objects.get_or_create(
+                type_texte=type_texte, langue='fr',
+                defaults={'titre': titre, 'contenu_html': contenu, 'version': '1.0'},
+            )
+            if created:
+                self.stdout.write(self.style.SUCCESS(f'  ✓ Texte légal : {titre}'))
+            elif not obj.contenu_html.strip():
+                obj.contenu_html = contenu
+                obj.save(update_fields=['contenu_html'])
+                self.stdout.write(self.style.WARNING(f'  ! Texte légal complété : {titre}'))
 
         # 2. Modèles d'emails par défaut
         modeles = [
@@ -69,6 +91,11 @@ class Command(BaseCommand):
                 password=password,
                 role=User.ADMIN,
                 is_active=True,
+            )
+            from administration.models import ProfilAdmin
+            ProfilAdmin.objects.get_or_create(
+                user=admin,
+                defaults={'nom': 'Administrateur', 'prenom': ''},
             )
             self.stdout.write(self.style.SUCCESS(f'✓ Compte admin créé : {email}'))
             self.stdout.write(self.style.WARNING(f'  → Mot de passe : {password}'))

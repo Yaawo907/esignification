@@ -168,3 +168,23 @@ def nettoyer_tokens_expires():
     from django.utils import timezone
     deleted, _ = TokenActivation.objects.filter(date_expiration__lt=timezone.now(), utilise=True).delete()
     logger.info(f"Tokens nettoyés : {deleted}")
+
+
+def synchroniser_signatures_yousign():
+    """Rattrapage automatique si un webhook Yousign n'a pas été reçu."""
+    from significations.models import Signification
+    from significations.views import synchroniser_signification_yousign
+
+    qs = Signification.objects.filter(
+        statut=Signification.STATUT_ATTENTE_SIGNATURE,
+    ).exclude(yousign_signature_request_id='')
+
+    for sig in qs:
+        try:
+            ok, message = synchroniser_signification_yousign(sig)
+            if ok:
+                logger.info("Yousign sync %s : %s", sig.reference, message)
+            else:
+                logger.debug("Yousign sync %s : %s", sig.reference, message)
+        except Exception as exc:
+            logger.error("Yousign sync %s : %s", sig.reference, exc)

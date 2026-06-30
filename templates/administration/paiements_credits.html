@@ -1,0 +1,180 @@
+{% extends 'base/base.html' %}
+{% block title %}Paiements &amp; crédits{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+{% block body %}
+<div class="dashboard-layout">
+  {% include 'administration/_sidebar.html' %}
+  <main class="dashboard-main">
+    <header class="topbar">
+      <button class="btn-hamburger" id="btn-hamburger" type="button" aria-label="Ouvrir le menu"><svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="2" rx="1"/><rect x="1" y="9" width="18" height="2" rx="1"/><rect x="1" y="15" width="18" height="2" rx="1"/></svg></button>
+      <div>
+        <h1 class="topbar-title">Paiements &amp; crédits</h1>
+        <div class="topbar-sub">Kkiapay, tarification et attribution aux huissiers</div>
+      </div>
+    </header>
+
+    <div class="content-area">
+      {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'success' }}" style="margin-bottom:12px;">{{ m }}</div>{% endfor %}{% endif %}
+
+      <div class="info-box" style="margin-bottom:20px;">
+        <strong>Modèle de facturation :</strong> 1 crédit est débité à chaque envoi de signification.
+        Lorsque le justiciable répond, un <em>retour de crédit</em> est appliqué selon l'issue
+        (acceptation, refus ou annulation).
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">Tarification des crédits</span></div>
+        <div class="card-body">
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="action" value="tarifs">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Prix d'un crédit (FCFA)</label>
+                <input type="number" name="prix_credit_fcfa" class="form-input" min="1"
+                       value="{{ config.prix_credit_fcfa }}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Débit à l'envoi (crédit)</label>
+                <input type="text" name="credit_reussie" class="form-input"
+                       value="{{ config.credit_signification_reussie }}">
+                <div class="form-hint">Conservé si le justiciable accepte</div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Coût net si refus</label>
+                <input type="text" name="credit_refusee" class="form-input"
+                       value="{{ config.credit_signification_refusee }}">
+                <div class="form-hint">Retour = débit − ce montant</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Coût net si annulation</label>
+                <input type="text" name="credit_annulee" class="form-input"
+                       value="{{ config.credit_signification_annulee }}">
+                <div class="form-hint">Retour = débit − ce montant</div>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+              <span class="btn-text">Enregistrer les tarifs</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">Kkiapay</span></div>
+        <div class="card-body">
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="action" value="kkiapay">
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+              <input type="checkbox" name="kkiapay_active" {% if config.kkiapay_active %}checked{% endif %}>
+              Activer les paiements Kkiapay
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+              <input type="checkbox" name="kkiapay_sandbox" {% if config.kkiapay_sandbox %}checked{% endif %}>
+              Mode sandbox (tests)
+            </label>
+            <div class="form-group">
+              <label class="form-label">Clé publique</label>
+              <input type="password" name="kkiapay_public_key" class="form-input" autocomplete="off"
+                     placeholder="{% if config.kkiapay_public_key_chiffre %}●●●●●●●● (configurée){% else %}Clé publique Kkiapay{% endif %}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Clé privée</label>
+              <input type="password" name="kkiapay_private_key" class="form-input" autocomplete="off"
+                     placeholder="{% if config.kkiapay_private_key_chiffre %}●●●●●●●● (configurée){% else %}Clé privée{% endif %}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Clé secrète</label>
+              <input type="password" name="kkiapay_secret" class="form-input" autocomplete="off"
+                     placeholder="{% if config.kkiapay_secret_chiffre %}●●●●●●●● (configurée){% else %}Secret Kkiapay{% endif %}">
+            </div>
+            <div class="form-hint" style="margin-bottom:14px;">
+              URL de callback à configurer chez Kkiapay :
+              <code>{{ callback_url }}</code>
+            </div>
+            <button type="submit" class="btn btn-primary btn-spinner" data-loading="Enregistrement…">
+              <span class="btn-text">Enregistrer Kkiapay</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">Attribuer des crédits gratuits</span></div>
+        <div class="card-body">
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="action" value="attribuer">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Huissier</label>
+                <select name="huissier_uuid" class="form-input" required>
+                  <option value="">— Choisir —</option>
+                  {% for h in huissiers %}
+                  <option value="{{ h.uuid }}">Me {{ h.prenom }} {{ h.nom }} — solde {{ h.solde_affiche }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nombre de crédits</label>
+                <input type="text" name="nb_credits" class="form-input" placeholder="ex. 10" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Motif (optionnel)</label>
+              <input type="text" name="motif" class="form-input" maxlength="200">
+            </div>
+            <button type="submit" class="btn btn-green btn-spinner" data-loading="Attribution…">
+              <span class="btn-text">Attribuer</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">Commandes récentes</span></div>
+        <div class="card-body" style="padding:0;overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Huissier</th><th>Crédits</th><th>Montant</th><th>Statut</th></tr></thead>
+            <tbody>
+              {% for c in commandes_recentes %}
+              <tr>
+                <td>{{ c.date_creation|date:"d/m/Y H:i" }}</td>
+                <td>Me {{ c.huissier.nom }}</td>
+                <td>{{ c.nb_credits }}</td>
+                <td>{{ c.montant_fcfa }} FCFA</td>
+                <td>{{ c.get_statut_display }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:20px;">Aucune commande</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Mouvements récents</span></div>
+        <div class="card-body" style="padding:0;overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Huissier</th><th>Type</th><th>Montant</th><th>Solde après</th></tr></thead>
+            <tbody>
+              {% for m in mouvements_recents %}
+              <tr>
+                <td>{{ m.date|date:"d/m/Y H:i" }}</td>
+                <td>Me {{ m.huissier.nom }}</td>
+                <td>{{ m.get_type_mouvement_display }}</td>
+                <td>{% if m.montant > 0 %}+{% endif %}{{ m.montant }}</td>
+                <td>{{ m.solde_apres }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:20px;">Aucun mouvement</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

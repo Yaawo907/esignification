@@ -65,6 +65,19 @@
         <div id="match-msg" style="display:none; font-size:11px; margin-top:4px;"></div>
       </div>
 
+      <div class="form-group" style="display:flex;align-items:flex-start;gap:10px;margin-top:8px;">
+        <input type="checkbox" name="accepter_textes" id="accepter_textes" required
+               style="margin-top:4px;width:16px;height:16px;">
+        <label for="accepter_textes" style="font-size:13px;line-height:1.6;cursor:pointer;">
+          J'ai lu et j'accepte les
+          <a href="{% url 'cgu' %}" target="_blank" rel="noopener noreferrer"
+             style="color:#1a3c6e;font-weight:600;text-decoration:underline;">CGU</a>
+          et la
+          <a href="{% url 'confidentialite' %}" target="_blank" rel="noopener noreferrer"
+             style="color:#1a3c6e;font-weight:600;text-decoration:underline;">Politique de confidentialité</a>
+        </label>
+      </div>
+
       <div style="margin-top:20px;">
         <button type="submit" id="btn-activer" class="btn btn-primary btn-spinner"
           style="width:100%;" data-loading="Activation…">

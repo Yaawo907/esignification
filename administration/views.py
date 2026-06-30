@@ -10,7 +10,7 @@ from django.core.validators import validate_email
 from django.urls import reverse
 from django.utils import timezone as tz
 from accounts.models import User
-from .models import ConfigurationPlateforme, TexteLegal, ModeleEmail, LotMerkle, PisteAudit
+from .models import ConfigurationPlateforme, TexteLegal, ModeleEmail, LotMerkle, PisteAudit, AcceptationTexteLegal
 from securite.audit import journaliser
 
 logger = logging.getLogger(__name__)
@@ -497,37 +497,77 @@ def gerer_textes_legaux(request):
 @login_required
 @admin_required
 def profil(request):
-    """Sécurité du compte administrateur — 2FA et mot de passe."""
+    """Profil et sécurité du compte administrateur."""
     from accounts.forms import ModificationMotDePasseForm
     from accounts.mfa_profil import contexte_mfa_profil, traiter_action_mfa_profil
+    from administration.forms import ProfilAdminForm
+    from administration.models import ProfilAdmin
 
     user = request.user
+    profil_admin = ProfilAdmin.get_for_user(user)
+    form_profil = ProfilAdminForm(instance=profil_admin)
     form_mdp = ModificationMotDePasseForm(user=user)
+    erreur_email = None
 
     if request.method == 'POST':
         action = request.POST.get('action', '')
 
-        if action == 'changer_mdp':
+        if action == 'profil':
+            form_profil = ProfilAdminForm(request.POST, instance=profil_admin)
+            if form_profil.is_valid():
+                form_profil.save()
+                journaliser(
+                    user, 'profil_admin_modifie', 'ProfilAdmin', profil_admin.uuid, request=request,
+                )
+                messages.success(request, 'Profil mis à jour.')
+                return redirect('administration:profil')
+
+        elif action == 'changer_mdp':
             form_mdp = ModificationMotDePasseForm(user=user, data=request.POST)
             if form_mdp.is_valid():
                 user.set_password(form_mdp.cleaned_data['nouveau_mdp'])
                 user.save()
                 journaliser(user, 'modification_mot_de_passe', request=request)
-                messages.success(request, "Mot de passe modifié. Reconnectez-vous.")
+                messages.success(request, 'Mot de passe modifié. Reconnectez-vous.')
                 from django.contrib.auth import logout
                 logout(request)
                 return redirect('/connexion/')
+
+        elif action == 'changer_email':
+            nouveau_email = escape(request.POST.get('nouveau_email', '').strip().lower())
+            mot_de_passe = request.POST.get('mot_de_passe', '')
+            if not nouveau_email:
+                erreur_email = "L'adresse email est obligatoire."
+            elif not user.check_password(mot_de_passe):
+                erreur_email = 'Mot de passe incorrect.'
+            elif nouveau_email == user.email.lower():
+                erreur_email = "C'est déjà votre adresse email actuelle."
+            elif User.objects.filter(email=nouveau_email).exclude(pk=user.pk).exists():
+                erreur_email = 'Cette adresse email est déjà associée à un compte.'
+            else:
+                ancien = user.email
+                user.email = nouveau_email
+                user.save(update_fields=['email'])
+                journaliser(
+                    user, 'changement_email_admin',
+                    description=f'{ancien} → {nouveau_email}', request=request,
+                )
+                messages.success(request, 'Adresse email mise à jour.')
+                return redirect('administration:profil')
         else:
             mfa_redirect = traiter_action_mfa_profil(
-                request, user, 'administration:profil', telephone='',
+                request, user, 'administration:profil', telephone=profil_admin.telephone,
             )
             if mfa_redirect:
                 return mfa_redirect
 
-    user.refresh_from_db(fields=['mfa_methode', 'totp_secret'])
+    user.refresh_from_db(fields=['mfa_methode', 'totp_secret', 'email'])
 
     return render(request, 'administration/profil.html', {
+        'profil_admin': profil_admin,
+        'form_profil': form_profil,
         'form_mdp': form_mdp,
+        'erreur_email': erreur_email,
         **contexte_mfa_profil(user, request.session),
     })
 
@@ -537,6 +577,185 @@ def profil(request):
 def audit(request):
     qs = PisteAudit.objects.order_by('-date')[:500]
     return render(request, 'administration/audit.html', {'activites': qs})
+
+
+@login_required
+@admin_required
+def acceptations_textes_legaux(request):
+    """Registre des acceptations CGU / confidentialité — production de preuves."""
+    qs = (
+        AcceptationTexteLegal.objects
+        .select_related('user', 'texte_legal')
+        .order_by('-date_acceptation')
+    )
+    q = escape((request.GET.get('q') or '').strip())
+    role = request.GET.get('role', '')
+    type_texte = request.GET.get('type_texte', '')
+
+    if q:
+        qs = qs.filter(user__email__icontains=q)
+    if role in dict(User.ROLE_CHOICES):
+        qs = qs.filter(user__role=role)
+    if type_texte in dict(TexteLegal.TYPE_CHOICES):
+        qs = qs.filter(type_texte=type_texte)
+
+    acceptations = list(qs[:500])
+    from administration.textes_legaux_service import libelle_utilisateur, libelle_role
+
+    lignes = []
+    for acc in acceptations:
+        lignes.append({
+            'acceptation': acc,
+            'nom': libelle_utilisateur(acc.user),
+            'role': libelle_role(acc.user),
+        })
+
+    return render(request, 'administration/acceptations_textes_legaux.html', {
+        'lignes': lignes,
+        'total': len(lignes),
+        'filtre_q': q,
+        'filtre_role': role,
+        'filtre_type': type_texte,
+        'roles': User.ROLE_CHOICES,
+        'types_texte': TexteLegal.TYPE_CHOICES,
+    })
+
+
+@login_required
+@admin_required
+def preuve_acceptation_pdf(request, uuid):
+    """PDF probatoire d'une acceptation (IP, date, heure, empreinte)."""
+    from django.http import HttpResponse
+    from administration.textes_legaux_service import generer_pdf_preuve_acceptation
+
+    acceptation = get_object_or_404(
+        AcceptationTexteLegal.objects.select_related('user'),
+        uuid=uuid,
+    )
+    contenu = generer_pdf_preuve_acceptation(acceptation)
+    journaliser(
+        request.user,
+        'export_preuve_acceptation',
+        objet_type='AcceptationTexteLegal',
+        objet_uuid=acceptation.uuid,
+        description=f"Export PDF preuve — {acceptation.user.email}",
+        request=request,
+    )
+    response = HttpResponse(contenu, content_type='application/pdf')
+    response['Content-Disposition'] = (
+        f'attachment; filename="preuve-acceptation-{acceptation.uuid}.pdf"'
+    )
+    return response
+
+
+@login_required
+@admin_required
+def preuve_acceptations_utilisateur_pdf(request, user_uuid):
+    """PDF regroupant toutes les acceptations d'un utilisateur."""
+    from django.http import HttpResponse
+    from administration.textes_legaux_service import generer_pdf_dossier_utilisateur
+
+    user = get_object_or_404(User, uuid=user_uuid)
+    acceptations = list(
+        AcceptationTexteLegal.objects.filter(user=user).select_related('user').order_by('date_acceptation')
+    )
+    if not acceptations:
+        raise Http404("Aucune acceptation enregistree pour cet utilisateur.")
+    contenu = generer_pdf_dossier_utilisateur(user, acceptations)
+    journaliser(
+        request.user,
+        'export_dossier_acceptations',
+        objet_type='User',
+        objet_uuid=user.uuid,
+        description=f"Export dossier acceptations — {user.email}",
+        request=request,
+    )
+    response = HttpResponse(contenu, content_type='application/pdf')
+    response['Content-Disposition'] = (
+        f'attachment; filename="dossier-acceptations-{user.uuid}.pdf"'
+    )
+    return response
+
+
+@login_required
+@admin_required
+@require_http_methods(["GET", "POST"])
+def gestion_paiements_credits(request):
+    """Configuration Kkiapay, tarifs crédits et attribution gratuite aux huissiers."""
+    from decimal import Decimal, InvalidOperation
+    from huissiers.models import ProfilHuissier
+    from paiements.models import CommandeCredit, MouvementCredit
+    from paiements.services.credits import attribuer_credits_gratuits, get_solde
+
+    config = ConfigurationPlateforme.get()
+
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+        if action == 'kkiapay':
+            config.kkiapay_active = request.POST.get('kkiapay_active') == 'on'
+            config.kkiapay_sandbox = request.POST.get('kkiapay_sandbox') == 'on'
+            for champ_post, champ_db in (
+                ('kkiapay_public_key', 'kkiapay_public_key_chiffre'),
+                ('kkiapay_private_key', 'kkiapay_private_key_chiffre'),
+                ('kkiapay_secret', 'kkiapay_secret_chiffre'),
+            ):
+                val = request.POST.get(champ_post, '').strip()
+                if val:
+                    from securite.chiffrement import chiffrer_texte
+                    setattr(config, champ_db, chiffrer_texte(val))
+            config.save()
+            journaliser(request.user, 'configuration_kkiapay_modifiee', request=request)
+            messages.success(request, "Configuration Kkiapay enregistrée.")
+        elif action == 'tarifs':
+            try:
+                config.prix_credit_fcfa = max(1, int(request.POST.get('prix_credit_fcfa', 2000)))
+                config.credit_signification_reussie = Decimal(
+                    request.POST.get('credit_reussie', '1').replace(',', '.')
+                )
+                config.credit_signification_refusee = Decimal(
+                    request.POST.get('credit_refusee', '0.5').replace(',', '.')
+                )
+                config.credit_signification_annulee = Decimal(
+                    request.POST.get('credit_annulee', '0.25').replace(',', '.')
+                )
+            except (InvalidOperation, ValueError):
+                messages.error(request, "Valeurs de crédits invalides.")
+                return redirect('administration:paiements_credits')
+            config.save()
+            journaliser(request.user, 'tarifs_credits_modifies', request=request)
+            messages.success(request, "Tarification des crédits enregistrée.")
+        elif action == 'attribuer':
+            huissier_uuid = request.POST.get('huissier_uuid', '')
+            motif = escape(request.POST.get('motif', '').strip())
+            try:
+                nb = Decimal(request.POST.get('nb_credits', '0').replace(',', '.'))
+            except InvalidOperation:
+                messages.error(request, "Montant invalide.")
+                return redirect('administration:paiements_credits')
+            huissier = get_object_or_404(ProfilHuissier, uuid=huissier_uuid)
+            try:
+                attribuer_credits_gratuits(huissier, nb, request.user, motif=motif)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+                return redirect('administration:paiements_credits')
+            journaliser(
+                request.user, 'credits_gratuits_attribues', 'ProfilHuissier', huissier.uuid,
+                description=f"+{nb} crédit(s)", request=request,
+            )
+            messages.success(request, f"{nb} crédit(s) attribué(s) à Me {huissier.nom}.")
+        return redirect('administration:paiements_credits')
+
+    huissiers = ProfilHuissier.objects.filter(statut='actif').order_by('nom', 'prenom')
+    for h in huissiers:
+        h.solde_affiche = get_solde(h)
+
+    return render(request, 'administration/paiements_credits.html', {
+        'config': config,
+        'huissiers': huissiers,
+        'commandes_recentes': CommandeCredit.objects.select_related('huissier').order_by('-date_creation')[:30],
+        'mouvements_recents': MouvementCredit.objects.select_related('huissier').order_by('-date')[:40],
+        'callback_url': request.build_absolute_uri('/paiements/callback/kkiapay/'),
+    })
 
 
 @login_required

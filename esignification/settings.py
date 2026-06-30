@@ -11,7 +11,11 @@ if _ENV_FILE.exists():
 
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env.bool('DEBUG', default=False)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost'])
+ALLOWED_HOSTS = [
+    h.strip().rstrip(';').rstrip(',')
+    for h in env.list('ALLOWED_HOSTS', default=['localhost'])
+    if h and h.strip().rstrip(';').rstrip(',')
+]
 # En dev : accepter tout tunnel ngrok sans mettre à jour ALLOWED_HOSTS à chaque session
 if DEBUG:
     for _ngrok_host in ('.ngrok-free.app', '.ngrok.io', '.ngrok.app'):
@@ -41,6 +45,7 @@ INSTALLED_APPS = [
     'taches',
     'api',
     'messagerie',
+    'paiements',
 ]
 
 MIDDLEWARE = [
@@ -56,6 +61,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'securite.middleware.AuditMiddleware',
     'securite.middleware.SecuriteHeadersMiddleware',
+    'accounts.middleware.TextesLegauxMiddleware',
 ]
 
 ROOT_URLCONF = 'esignification.urls'
@@ -74,6 +80,7 @@ TEMPLATES = [
                 'django.template.context_processors.i18n',
                 'django.template.context_processors.csrf',
                 'administration.context_processors.config_plateforme',
+                'administration.context_processors.profil_admin',
                 'huissiers.context_processors.sidebar_huissier',
             ],
         },

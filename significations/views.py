@@ -76,6 +76,18 @@ def envoyer_signification(request):
         contenu_chiffre = chiffrer_fichier(contenu)
         huissier = request.user.profil_huissier if hasattr(request.user, 'profil_huissier') else request.user.profil_clerc.huissier
 
+        from paiements.services.credits import verifier_solde_envoi, debiter_envoi_signification, CreditInsuffisant
+        try:
+            verifier_solde_envoi(huissier)
+        except CreditInsuffisant as exc:
+            from django.contrib import messages
+            messages.error(
+                request,
+                f"Crédits insuffisants (solde : {exc.solde}, requis : {exc.requis}). "
+                f"Rechargez votre solde avant d'envoyer une signification."
+            )
+            return redirect('paiements:achat_credits')
+
         from administration.models import ConfigurationPlateforme as _CP
         yousign_actif = _CP.get().yousign_active
 
@@ -142,6 +154,7 @@ def envoyer_signification(request):
             journaliser(request.user, 'signification_envoyee', 'Signification', sig.uuid, request=request)
             messages.success(request, f"Signification {sig.reference} envoyée avec succès.")
 
+        debiter_envoi_signification(sig, request.user)
         return redirect('huissiers:tableau_de_bord')
     # Charger les signatures enregistrées de l'huissier
     from huissiers.models import ParametreSignatureHuissier
@@ -150,11 +163,20 @@ def envoyer_signification(request):
     params_sig = None
     if huissier:
         params_sig, _ = ParametreSignatureHuissier.objects.get_or_create(huissier=huissier)
+    from paiements.services.credits import get_solde, credit_debit_envoi, cout_net_apres_refus, cout_net_apres_annulation
+    from administration.models import ConfigurationPlateforme
+    config = ConfigurationPlateforme.get()
+    solde_credits = get_solde(huissier) if huissier else None
     return render(request, 'significations/envoyer.html', {
         'justiciable': justiciable,
         'q': q,
         'resultats_recherche': resultats_recherche,
         'params_sig': params_sig,
+        'solde_credits': solde_credits,
+        'credit_debit_envoi': credit_debit_envoi(),
+        'credit_retour_refus': credit_debit_envoi() - cout_net_apres_refus(),
+        'credit_retour_annulation': credit_debit_envoi() - cout_net_apres_annulation(),
+        'prix_credit_fcfa': config.prix_credit_fcfa,
     })
 
 
@@ -174,6 +196,8 @@ def repondre_signification(request, uuid):
         sig.statut = Signification.STATUT_ACCEPTEE
         sig.date_acceptation = timezone.now()
         sig.save(update_fields=['statut', 'date_acceptation'])
+        from paiements.services.credits import rembourser_selon_reponse_client
+        rembourser_selon_reponse_client(sig, Signification.STATUT_ACCEPTEE)
         _generer_certificat(sig)
         journaliser(sig.justiciable.user, 'signification_acceptee', 'Signification', sig.uuid)
         # Rediriger vers connexion avec email pré-rempli
@@ -186,6 +210,8 @@ def repondre_signification(request, uuid):
         sig.statut = Signification.STATUT_REFUSEE
         sig.date_refus = timezone.now()
         sig.save(update_fields=['statut', 'date_refus'])
+        from paiements.services.credits import rembourser_selon_reponse_client
+        rembourser_selon_reponse_client(sig, Signification.STATUT_REFUSEE)
         journaliser(sig.justiciable.user, 'signification_refusee', 'Signification', sig.uuid)
         return render(request, 'significations/refus_confirme.html', {'sig': sig})
     return render(request, 'significations/lien_invalide.html')
@@ -543,9 +569,42 @@ def basculer_traditionnel(request, uuid):
         return redirect('huissiers:significations')
     sig.statut = Signification.STATUT_TRADITIONNELLE
     sig.save(update_fields=['statut'])
+    from paiements.services.credits import rembourser_selon_reponse_client
+    rembourser_selon_reponse_client(sig, Signification.STATUT_TRADITIONNELLE, auteur=request.user)
     journaliser(request.user, 'signification_basculee_traditionnelle', 'Signification', sig.uuid, request=request)
     from django.contrib import messages
     messages.success(request, f"La signification {sig.reference} a été basculée en mode traditionnel.")
+    return redirect('huissiers:significations')
+
+
+@login_required
+@require_http_methods(["POST"])
+def annuler_signification(request, uuid):
+    """Annule une signification en cours — retour de crédit selon tarif annulation."""
+    sig = get_object_or_404(Signification, uuid=uuid)
+    user = request.user
+    from accounts.models import User as U
+    if user.role not in [U.HUISSIER, U.CLERC]:
+        raise Http404
+    h = user.profil_huissier if user.role == U.HUISSIER else user.profil_clerc.huissier
+    if sig.huissier != h:
+        raise Http404
+    if sig.statut not in (
+        Signification.STATUT_EN_ATTENTE,
+        Signification.STATUT_ATTENTE_SIGNATURE,
+        Signification.STATUT_RELANCE_1,
+        Signification.STATUT_RELANCE_2,
+    ):
+        from django.contrib import messages
+        messages.error(request, "Cette signification ne peut plus être annulée.")
+        return redirect('huissiers:significations')
+    sig.statut = Signification.STATUT_ANNULEE
+    sig.save(update_fields=['statut'])
+    from paiements.services.credits import rembourser_selon_reponse_client
+    rembourser_selon_reponse_client(sig, Signification.STATUT_ANNULEE, auteur=request.user)
+    journaliser(request.user, 'signification_annulee', 'Signification', sig.uuid, request=request)
+    from django.contrib import messages
+    messages.success(request, f"Signification {sig.reference} annulée.")
     return redirect('huissiers:significations')
 
 
@@ -662,6 +721,25 @@ def finaliser_yousign_et_envoyer_justiciable(sig, sig_req_id=None):
                 description="Acte transmis au justiciable après signature Yousign")
 
 
+def synchroniser_signification_yousign(sig):
+    """
+    Interroge Yousign et finalise si la signature est terminée.
+    Retourne (succes: bool, message: str).
+    """
+    if sig.statut != Signification.STATUT_ATTENTE_SIGNATURE:
+        return False, "Cette signification n'est pas en attente de signature huissier."
+    sig_req_id = sig.yousign_signature_request_id
+    if not sig_req_id:
+        return False, "Aucune demande Yousign associée à cette signification."
+
+    from .yousign_service import recuperer_statut_yousign
+    statut_ys = recuperer_statut_yousign(sig_req_id)
+    if statut_ys == 'done':
+        finaliser_yousign_et_envoyer_justiciable(sig, sig_req_id)
+        return True, "Signature confirmée. L'acte a été transmis au justiciable."
+    return False, f"Signature Yousign en cours (statut API : {statut_ys or 'inconnu'})."
+
+
 def _lancer_yousign_si_actif(signification, pdf_bytes) -> tuple[bool, str]:
     """
     Lance la demande de signature Yousign pour l'huissier.
@@ -689,6 +767,64 @@ def _lancer_yousign_si_actif(signification, pdf_bytes) -> tuple[bool, str]:
         return False, ''
 
 
+def synchroniser_signification_yousign(sig):
+    """
+    Interroge l'API Yousign et finalise l'envoi au justiciable si la signature est terminée.
+    Retourne (succes: bool, message: str).
+    """
+    if sig.statut != Signification.STATUT_ATTENTE_SIGNATURE:
+        return False, "Cette signification n'est pas en attente de signature huissier."
+    sig_req_id = (sig.yousign_signature_request_id or '').strip()
+    if not sig_req_id:
+        return False, "Aucune demande Yousign associée à cette signification."
+
+    from .yousign_service import recuperer_statut_yousign
+    try:
+        statut_ys = recuperer_statut_yousign(sig_req_id)
+    except Exception as exc:
+        return False, f"Impossible de contacter Yousign : {exc}"
+
+    if statut_ys == 'done':
+        try:
+            finaliser_yousign_et_envoyer_justiciable(sig, sig_req_id)
+        except Exception as exc:
+            return False, f"Signature confirmée mais échec de finalisation : {exc}"
+        return True, "Signature confirmée. L'acte a été transmis au justiciable."
+
+    return False, f"Signature Yousign en cours (statut API : {statut_ys or 'inconnu'})."
+
+
+@login_required
+@require_http_methods(["POST"])
+def synchroniser_yousign(request, uuid):
+    """Rattrapage manuel si le webhook Yousign n'a pas été reçu."""
+    if not _require_huissier(request.user):
+        raise Http404
+
+    from accounts.models import User
+    huissier = (
+        request.user.profil_huissier
+        if request.user.role == User.HUISSIER
+        else request.user.profil_clerc.huissier
+    )
+    sig = get_object_or_404(Signification, uuid=uuid, huissier=huissier)
+
+    ok, message = synchroniser_signification_yousign(sig)
+    from django.contrib import messages
+    if ok:
+        sig.refresh_from_db()
+        journaliser(request.user, 'yousign_sync_manuelle', 'Signification', sig.uuid, request=request)
+        messages.success(request, message)
+    else:
+        messages.warning(request, message)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        from django.http import JsonResponse
+        return JsonResponse({'ok': ok, 'message': message, 'statut': sig.statut})
+
+    return redirect('huissiers:significations')
+
+
 # ─────────────────────────────────────────────────────────────
 #  Yousign — Webhook
 # ─────────────────────────────────────────────────────────────
@@ -697,8 +833,11 @@ from django.views.decorators.csrf import csrf_exempt
 
 
 @csrf_exempt
-@require_http_methods(["POST"])
+@require_http_methods(["GET", "POST"])
 def webhook_yousign(request):
+    if request.method == 'GET':
+        return HttpResponse('Yousign webhook OK', content_type='text/plain')
+
     import json as _json
     import logging
     logger = logging.getLogger(__name__)
@@ -723,7 +862,8 @@ def webhook_yousign(request):
         return HttpResponseBadRequest("JSON invalide")
 
     event_name = data.get('event_name', '')
-    sig_req_id = data.get('data', {}).get('signature_request', {}).get('id', '')
+    from .yousign_service import extraire_signature_request_id
+    sig_req_id = extraire_signature_request_id(data)
 
     logger.info("Webhook Yousign : %s — request_id=%s", event_name, sig_req_id)
 
@@ -733,13 +873,15 @@ def webhook_yousign(request):
     try:
         sig = Signification.objects.get(yousign_signature_request_id=sig_req_id)
     except Signification.DoesNotExist:
+        logger.warning("Webhook Yousign : signification introuvable pour %s", sig_req_id)
         return HttpResponse(status=200)
 
     if event_name == 'signature_request.done':
         try:
             finaliser_yousign_et_envoyer_justiciable(sig, sig_req_id)
         except Exception as e:
-            logger.error("Webhook Yousign : erreur finalisation — %s", e)
+            logger.error("Webhook Yousign : erreur finalisation — %s", e, exc_info=True)
+            return HttpResponse(status=500)
 
     elif event_name in ('signature_request.expired', 'signature_request.canceled',
                         'signature_request.rejected'):
@@ -748,7 +890,6 @@ def webhook_yousign(request):
         sig.save(update_fields=['yousign_statut'])
         journaliser(None, f'yousign_{nouveau_statut}', 'Signification', sig.uuid,
                     description=f"Yousign {nouveau_statut} : {sig_req_id}")
-        # Notifier l'huissier que la signature a échoué/expiré
         try:
             from notifications.service import envoyer_yousign_expiree
             envoyer_yousign_expiree(sig, nouveau_statut)
@@ -756,3 +897,4 @@ def webhook_yousign(request):
             logger.error("Webhook Yousign : notification echec huissier — %s", e)
 
     return HttpResponse(status=200)
+

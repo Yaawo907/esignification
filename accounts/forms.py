@@ -128,7 +128,7 @@ class InscriptionJusticiableForm(forms.Form):
         }),
         label="Confirmer le mot de passe",
     )
-    accepter_cgu = forms.BooleanField(required=True, label="J'accepte les CGU")
+    accepter_cgu = forms.BooleanField(required=True, label="J'accepte les CGU et la politique de confidentialité")
 
     def clean_email_domicile(self):
         from justiciables.models import ProfilJusticiable

@@ -7,6 +7,7 @@
     <h2 class="auth-title">Créer mon compte justiciable</h2>
     <form method="post" novalidate>
       {% csrf_token %}
+      {% if token %}<input type="hidden" name="token" value="{{ token }}">{% endif %}
       {% if form.non_field_errors %}<div class="form-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
       <div class="form-group">
         <label class="form-label">Type de compte</label>
@@ -59,8 +60,16 @@
           {% if form.confirmer_mdp.errors %}<p class="field-error">{{ form.confirmer_mdp.errors.0 }}</p>{% endif %}
         </div>
       </div>
-      <div class="form-group form-check">
-        {{ form.accepter_cgu }} <label>J'accepte les <a href="{% url 'cgu' %}" target="_blank" rel="noopener noreferrer">CGU</a></label>
+      <div class="form-group" style="display:flex;align-items:flex-start;gap:10px;margin-top:8px;">
+        {{ form.accepter_cgu }}
+        <label for="{{ form.accepter_cgu.id_for_label }}" style="font-size:13px;line-height:1.6;cursor:pointer;">
+          J'ai lu et j'accepte les
+          <a href="{% url 'cgu' %}" target="_blank" rel="noopener noreferrer"
+             style="color:#1a3c6e;font-weight:600;text-decoration:underline;">CGU</a>
+          et la
+          <a href="{% url 'confidentialite' %}" target="_blank" rel="noopener noreferrer"
+             style="color:#1a3c6e;font-weight:600;text-decoration:underline;">Politique de confidentialité</a>
+        </label>
       </div>
       {% if form.accepter_cgu.errors %}<p class="field-error">{{ form.accepter_cgu.errors.0 }}</p>{% endif %}
       <button type="submit" class="btn btn-primary btn-full btn-spinner" data-loading="Création…">

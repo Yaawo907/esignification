@@ -56,6 +56,26 @@
       {% endfor %}
       {% endif %}
 
+      {% if solde_credits is not None %}
+      <div class="card credit-solde-card" style="margin-bottom:16px; padding:16px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+           background:linear-gradient(135deg, #edf2fb 0%, #f0fdf4 100%); border:1px solid var(--primary-border);">
+        <div style="width:48px;height:48px;border-radius:12px;background:var(--primary);color:#fff;
+             display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">💳</div>
+        <div style="flex:1;min-width:180px;">
+          <div style="font-size:11px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;">Solde crédits</div>
+          <div style="font-size:26px;font-weight:700;color:var(--primary);line-height:1.2;">{{ solde_credits }}</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">
+            {{ credit_debit_envoi }} crédit débité à l'envoi
+            {% if credit_retour_refus %}· +{{ credit_retour_refus }} si refus{% endif %}
+            {% if credit_retour_annulation %}· +{{ credit_retour_annulation }} si annulation{% endif %}
+          </div>
+        </div>
+        {% if solde_credits < credit_debit_envoi %}
+        <a href="{% url 'paiements:achat_credits' %}" class="btn btn-primary spinner-link">Recharger</a>
+        {% endif %}
+      </div>
+      {% endif %}
+
       <!-- ══════════════════════════════════════════════════════════
            ETAPE 1 : Destinataire
            Ce bloc est HORS du form POST pour pouvoir contenir

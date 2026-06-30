@@ -38,6 +38,7 @@ urlpatterns = [
     path('significations/', include('significations.urls', namespace='significations')),
     path('api/', include('api.urls', namespace='api')),
     path('messagerie/', include('messagerie.urls', namespace='messagerie')),
+    path('paiements/', include('paiements.urls', namespace='paiements')),
 ]
 
 # Fichiers media — servis par Django (DEBUG=True ou False)

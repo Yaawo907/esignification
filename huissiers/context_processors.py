@@ -22,7 +22,16 @@ def sidebar_badges_for_huissier(request, huissier):
         'nb_demandes_modif': nb_demandes_modif,
         'nb_messages_non_lus': nb_messages_non_lus,
         'stats_en_attente': stats_en_attente,
+        'solde_credits': _solde_huissier(huissier),
     }
+
+
+def _solde_huissier(huissier):
+    try:
+        from paiements.services.credits import get_solde
+        return get_solde(huissier)
+    except Exception:
+        return None
 
 
 def sidebar_huissier(request):

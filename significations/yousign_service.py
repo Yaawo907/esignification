@@ -275,36 +275,83 @@ def telecharger_audit_trail(sig_req_id, signer_id=None):
     )
 
 
-def _get_webhook_secret():
-    """Secret HMAC Yousign : base (prod) puis .env en secours (dev)."""
+def _secrets_webhook():
+    """Secrets HMAC valides (base admin + variables d'environnement)."""
     from django.conf import settings
     from administration.models import ConfigurationPlateforme
     from securite.chiffrement import dechiffrer_texte
 
-    env_secret = getattr(settings, 'YOUSIGN_WEBHOOK_SECRET', '').strip()
-    if getattr(settings, 'DEBUG', False) and env_secret:
-        return env_secret
+    secrets = []
+    for raw in (
+        getattr(settings, 'YOUSIGN_WEBHOOK_SECRET', ''),
+        getattr(settings, 'WEBHOOK_SECRET', ''),
+    ):
+        s = (raw or '').strip()
+        if not s:
+            continue
+        if s.startswith('http://') or s.startswith('https://'):
+            logger.warning(
+                "Secret webhook Yousign invalide (ressemble à une URL, pas à une clé HMAC) : %s",
+                s[:48],
+            )
+            continue
+        if s not in secrets:
+            secrets.append(s)
 
-    config = ConfigurationPlateforme.get()
-    if config.yousign_webhook_secret_chiffre:
-        return dechiffrer_texte(config.yousign_webhook_secret_chiffre)
+    if getattr(settings, 'DEBUG', False) and secrets:
+        return secrets
 
-    return env_secret
+    try:
+        config = ConfigurationPlateforme.get()
+        if config.yousign_webhook_secret_chiffre:
+            db_secret = dechiffrer_texte(config.yousign_webhook_secret_chiffre).strip()
+            if db_secret and db_secret not in secrets:
+                if db_secret.startswith('http://') or db_secret.startswith('https://'):
+                    logger.warning(
+                        "Secret webhook Yousign en base invalide (URL au lieu d'une clé HMAC)."
+                    )
+                else:
+                    secrets.append(db_secret)
+    except Exception as exc:
+        logger.warning("Webhook Yousign : lecture secret base — %s", exc)
+
+    return secrets
+
+
+def _get_webhook_secret():
+    """Compatibilité — retourne le premier secret configuré."""
+    secrets = _secrets_webhook()
+    return secrets[0] if secrets else ''
 
 
 def valider_webhook(payload_bytes, signature_header):
     """Valide la signature HMAC-SHA256 du callback Yousign."""
-    secret = _get_webhook_secret()
-    if not secret:
+    secrets = _secrets_webhook()
+    if not secrets:
         logger.warning("Webhook Yousign : secret non configure - accepte sans validation.")
         return True
-    expected = 'sha256=' + hmac.new(
-        secret.encode('utf-8'), payload_bytes, hashlib.sha256,
-    ).hexdigest()
-    if hmac.compare_digest(expected, signature_header or ''):
-        return True
+    header = signature_header or ''
+    for secret in secrets:
+        expected = 'sha256=' + hmac.new(
+            secret.encode('utf-8'), payload_bytes, hashlib.sha256,
+        ).hexdigest()
+        if hmac.compare_digest(expected, header):
+            return True
     logger.warning(
-        "Webhook Yousign : signature invalide (header present=%s)",
-        bool(signature_header),
+        "Webhook Yousign : signature invalide (header present=%s, secrets testes=%d)",
+        bool(header), len(secrets),
     )
     return False
+
+
+def extraire_signature_request_id(payload: dict) -> str:
+    """Extrait l'ID signature_request depuis le payload webhook Yousign v3."""
+    data = payload.get('data') or {}
+    if not isinstance(data, dict):
+        return ''
+    sig_req = data.get('signature_request')
+    if isinstance(sig_req, dict):
+        return sig_req.get('id', '') or ''
+    if isinstance(sig_req, str):
+        return sig_req
+    return data.get('signature_request_id', '') or ''

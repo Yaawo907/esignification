@@ -14,17 +14,19 @@
     <a href="{% url 'administration:liste_huissiers' %}" class="nav-item nav-item-white spinner-link{% if current == 'liste_huissiers' or current == 'creer_huissier' %} active{% endif %}">✎ Huissiers</a>
     <div class="nav-section">Paramétrage</div>
     <a href="{% url 'administration:configuration' %}" class="nav-item nav-item-white spinner-link{% if current == 'configuration' %} active{% endif %}">⚙ Configuration</a>
+    <a href="{% url 'administration:paiements_credits' %}" class="nav-item nav-item-white spinner-link{% if current == 'paiements_credits' %} active{% endif %}">💳 Paiements &amp; crédits</a>
     <a href="{% url 'administration:textes_legaux' %}" class="nav-item nav-item-white spinner-link{% if current == 'textes_legaux' %} active{% endif %}">§ Textes légaux</a>
+    <a href="{% url 'administration:acceptations_textes_legaux' %}" class="nav-item nav-item-white spinner-link{% if current == 'acceptations_textes_legaux' %} active{% endif %}">✓ Acceptations CGU</a>
     <a href="{% url 'administration:audit' %}" class="nav-item nav-item-white spinner-link{% if current == 'audit' %} active{% endif %}">🔍 Audit</a>
     <div class="nav-section" style="margin-top:10px;">Mon compte</div>
-    <a href="{% url 'administration:profil' %}" class="nav-item nav-item-white spinner-link{% if current == 'profil' %} active{% endif %}">👤 Sécurité &amp; connexion</a>
+    <a href="{% url 'administration:profil' %}" class="nav-item nav-item-white spinner-link{% if current == 'profil' %} active{% endif %}">👤 Mon profil</a>
     <div class="nav-section">Communication</div>
     <a href="{% url 'messagerie:liste_conversations' %}" class="nav-item nav-item-white spinner-link">✉ Messagerie</a>
   </nav>
   <div class="sidebar-user sidebar-user-dark">
-    <div class="user-avatar">{{ request.user.email|first|upper }}</div>
+    <div class="user-avatar">{{ profil_admin.nom|default:request.user.email|first|upper }}</div>
     <div>
-      <div class="user-name" style="color:#fff;">{{ request.user.email }}</div>
+      <div class="user-name" style="color:#fff;">{% firstof profil_admin.nom_complet request.user.email %}</div>
       <div class="user-role">Administrateur</div>
     </div>
     <a href="{% url 'accounts:deconnexion' %}" class="logout-btn logout-white" title="Déconnexion">⏻</a>

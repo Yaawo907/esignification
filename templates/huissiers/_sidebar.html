@@ -26,6 +26,11 @@
        class="nav-item spinner-link {% if request.resolver_match.url_name == 'inviter' %}active{% endif %}">
       <span class="nav-icon">+</span> Inviter
     </a>
+    <a href="{% url 'paiements:achat_credits' %}"
+       class="nav-item spinner-link {% if request.resolver_match.namespace == 'paiements' %}active{% endif %}">
+      <span class="nav-icon">💳</span> Mes crédits
+      {% if solde_credits is not None %}<span class="nav-badge">{{ solde_credits }}</span>{% endif %}
+    </a>
     <div class="nav-section" style="margin-top:10px;">Étude</div>
     <a href="{% url 'huissiers:liste_clercs' %}"
        class="nav-item spinner-link {% if request.resolver_match.url_name == 'liste_clercs' %}active{% endif %}">

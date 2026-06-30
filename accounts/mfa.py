@@ -24,6 +24,8 @@ def telephone_utilisateur(user) -> str:
             return (c.telephone or c.huissier.telephone or '').strip()
         if user.role == User.JUSTICIABLE:
             return (user.profil_justiciable.telephone or '').strip()
+        if user.role == User.ADMIN:
+            return (user.profil_admin.telephone or '').strip()
     except Exception:
         pass
     return ''

@@ -91,9 +91,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.role == self.JUSTICIABLE
 
     def get_profil(self):
+        if self.role == self.ADMIN:
+            try:
+                from administration.models import ProfilAdmin
+                return ProfilAdmin.get_for_user(self)
+            except Exception:
+                return getattr(self, 'profil_admin', None)
         if self.role in [self.HUISSIER, self.CLERC]:
             return getattr(self, 'profil_huissier', None)
-        elif self.role == self.JUSTICIABLE:
+        if self.role == self.JUSTICIABLE:
             return getattr(self, 'profil_justiciable', None)
         return None
 

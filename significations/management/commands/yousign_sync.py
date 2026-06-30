@@ -1,15 +1,14 @@
 """
 Synchronise les significations en attente de signature Yousign.
 
-Usage en développement local (sans webhook public) :
+Usage en développement local (sans webhook public) ou en secours production :
   python manage.py yousign_sync
   python manage.py yousign_sync --reference SIG-2026-0004
 """
 from django.core.management.base import BaseCommand
 
 from significations.models import Signification
-from significations.yousign_service import recuperer_statut_yousign
-from significations.views import finaliser_yousign_et_envoyer_justiciable
+from significations.views import synchroniser_signification_yousign
 
 
 class Command(BaseCommand):
@@ -38,23 +37,8 @@ class Command(BaseCommand):
             return
 
         for sig in qs:
-            sig_req_id = sig.yousign_signature_request_id
-            try:
-                statut_ys = recuperer_statut_yousign(sig_req_id)
-            except Exception as exc:
-                self.stderr.write(f"{sig.reference} : erreur API Yousign — {exc}")
-                continue
-
-            if statut_ys == 'done':
-                try:
-                    finaliser_yousign_et_envoyer_justiciable(sig, sig_req_id)
-                except Exception as exc:
-                    self.stderr.write(f"{sig.reference} : échec finalisation — {exc}")
-                    continue
-                self.stdout.write(self.style.SUCCESS(
-                    f"{sig.reference} : signature reçue, justiciable notifié."
-                ))
+            ok, message = synchroniser_signification_yousign(sig)
+            if ok:
+                self.stdout.write(self.style.SUCCESS(f"{sig.reference} : {message}"))
             else:
-                self.stdout.write(
-                    f"{sig.reference} : statut Yousign = {statut_ys or 'inconnu'} (pas encore signé)."
-                )
+                self.stdout.write(f"{sig.reference} : {message}")

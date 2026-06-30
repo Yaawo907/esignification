@@ -116,6 +116,9 @@ def mfa_verification(request):
 
 
 def redirect_apres_connexion(user):
+    from administration.textes_legaux_service import textes_a_reaccepter
+    if textes_a_reaccepter(user):
+        return '/reaccepter-textes-legaux/'
     if user.role == User.ADMIN:
         return '/administration/'
     elif user.role in [User.HUISSIER, User.CLERC]:
@@ -170,6 +173,11 @@ def inscription_huissier(request):
             statut='actif',
         )
         marquer_token_utilise(token_obj)
+        from administration.textes_legaux_service import enregistrer_acceptations
+        from administration.models import AcceptationTexteLegal
+        enregistrer_acceptations(
+            user, request, AcceptationTexteLegal.CONTEXTE_INSCRIPTION_HUISSIER,
+        )
         journaliser(user, 'inscription_huissier_complete', request=request)
         login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         messages.success(request, "Compte activé avec succès. Bienvenue !")
@@ -181,9 +189,31 @@ def inscription_huissier(request):
     })
 
 
+def _lier_invitation_justiciable(token_obj, profil):
+    """Marque l'invitation huissier comme utilisée après création du compte."""
+    from justiciables.models import InvitationJusticiable
+    updated = InvitationJusticiable.objects.filter(
+        token=token_obj.token,
+        utilise=False,
+    ).update(utilise=True, justiciable_cree_id=profil.pk)
+    if updated:
+        return
+    meta = token_obj.metadata or {}
+    huissier_uuid = meta.get('huissier_uuid')
+    if not huissier_uuid:
+        return
+    InvitationJusticiable.objects.filter(
+        huissier__uuid=huissier_uuid,
+        email_cible__iexact=token_obj.email,
+        utilise=False,
+    ).order_by('-date_envoi').update(
+        utilise=True, justiciable_cree_id=profil.pk,
+    )
+
+
 @require_http_methods(["GET", "POST"])
 def inscription_justiciable(request):
-    token_brut = request.GET.get('token', '')
+    token_brut = (request.POST.get('token') or request.GET.get('token', '')).strip()
     token_obj, erreur = valider_token(token_brut, TokenActivation.INVITATION_JUSTICIABLE)
     if erreur:
         return render(request, 'accounts/token_invalide.html', {'erreur': erreur})
@@ -211,9 +241,18 @@ def inscription_justiciable(request):
         # Envoyer confirmation email domicile
         _envoyer_confirmation_domicile(user, d['email_domicile'])
         marquer_token_utilise(token_obj)
+        _lier_invitation_justiciable(token_obj, profil)
+        from administration.textes_legaux_service import enregistrer_acceptations
+        from administration.models import AcceptationTexteLegal
+        enregistrer_acceptations(
+            user, request, AcceptationTexteLegal.CONTEXTE_INSCRIPTION_JUSTICIABLE,
+        )
         journaliser(user, 'inscription_justiciable_en_attente', request=request)
         return render(request, 'accounts/confirmation_envoyee.html', {'email': d['email_domicile']})
-    return render(request, 'accounts/inscription_justiciable.html', {'form': form})
+    return render(request, 'accounts/inscription_justiciable.html', {
+        'form': form,
+        'token': token_brut,
+    })
 
 
 def _envoyer_confirmation_domicile(user, email_domicile):
@@ -346,9 +385,12 @@ def inscription_clerc(request):
     if request.method == 'POST':
         nouveau_mdp = request.POST.get('nouveau_mdp', '').strip()
         confirmer_mdp = request.POST.get('confirmer_mdp', '').strip()
+        accepter_textes = request.POST.get('accepter_textes')
         erreur_form = None
 
-        if len(nouveau_mdp) < 10:
+        if not accepter_textes:
+            erreur_form = "Vous devez accepter les CGU et la politique de confidentialité."
+        elif len(nouveau_mdp) < 10:
             erreur_form = "Le mot de passe doit contenir au moins 10 caractères."
         elif nouveau_mdp != confirmer_mdp:
             erreur_form = "Les mots de passe ne correspondent pas."
@@ -390,6 +432,11 @@ def inscription_clerc(request):
             )
 
             marquer_token_utilise(token_obj)
+            from administration.textes_legaux_service import enregistrer_acceptations
+            from administration.models import AcceptationTexteLegal
+            enregistrer_acceptations(
+                user, request, AcceptationTexteLegal.CONTEXTE_INSCRIPTION_CLERC,
+            )
             journaliser(user, 'inscription_clerc', request=request)
             messages.success(request, "Votre compte clerc a été activé. Vous pouvez vous connecter.")
             return redirect('accounts:connexion')
@@ -401,3 +448,29 @@ def inscription_clerc(request):
     return render(request, 'accounts/inscription_clerc.html', {
         'email': email, 'prenom': prenom, 'nom': nom,
     })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def reaccepter_textes_legaux(request):
+    from administration.textes_legaux_service import enregistrer_acceptations, textes_a_reaccepter
+    from administration.models import AcceptationTexteLegal
+
+    textes = textes_a_reaccepter(request.user)
+    if not textes:
+        return redirect(redirect_apres_connexion(request.user))
+
+    if request.method == 'POST':
+        if not request.POST.get('accepter_textes'):
+            messages.error(request, "Vous devez accepter les textes pour continuer.")
+        else:
+            enregistrer_acceptations(
+                request.user, request, AcceptationTexteLegal.CONTEXTE_REACCEPTATION,
+            )
+            messages.success(request, "Vos acceptations ont été enregistrées.")
+            next_url = request.GET.get('next', '')
+            if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+                return redirect(next_url)
+            return redirect(redirect_apres_connexion(request.user))
+
+    return render(request, 'accounts/reaccepter_textes_legaux.html', {'textes': textes})

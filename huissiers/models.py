@@ -20,6 +20,10 @@ class ProfilHuissier(models.Model):
     ], default='en_attente')
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
+    solde_credits = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text='Solde de crédits disponibles pour les significations',
+    )
 
     class Meta:
         verbose_name = 'Profil huissier'

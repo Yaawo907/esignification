@@ -179,6 +179,17 @@
                       </a>
                     {% endif %}
 
+                    {% if sig.statut == 'attente_signature' %}
+                      <form method="post" action="{% url 'significations:synchroniser_yousign' sig.uuid %}"
+                        style="display:inline;" title="Vérifier si Yousign a bien enregistré votre signature">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-xs btn-primary btn-spinner"
+                          data-loading="Vérification…">
+                          ✓ Confirmer signature
+                        </button>
+                      </form>
+                    {% endif %}
+
                     {% if sig.statut == 'en_attente' or sig.statut == 'relance_1' or sig.statut == 'relance_2' %}
                       <form method="post" action="{% url 'significations:basculer_traditionnel' sig.uuid %}"
                         style="display:inline;" title="Basculer en signification traditionnelle">

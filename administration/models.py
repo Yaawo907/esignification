@@ -2,6 +2,38 @@ import uuid
 from django.db import models
 
 
+class ProfilAdmin(models.Model):
+    """Profil de l'administrateur de la plateforme."""
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
+    user = models.OneToOneField(
+        'accounts.User', on_delete=models.CASCADE, related_name='profil_admin',
+    )
+    nom = models.CharField(max_length=100)
+    prenom = models.CharField(max_length=100, blank=True)
+    telephone = models.CharField(max_length=20, blank=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Profil administrateur'
+
+    def __str__(self):
+        return self.nom_complet or self.user.email
+
+    @property
+    def nom_complet(self):
+        return f'{self.prenom} {self.nom}'.strip()
+
+    @classmethod
+    def get_for_user(cls, user):
+        if not user or getattr(user, 'role', None) != 'admin':
+            return None
+        profil, _ = cls.objects.get_or_create(
+            user=user,
+            defaults={'nom': 'Administrateur', 'prenom': ''},
+        )
+        return profil
+
+
 class ConfigurationPlateforme(models.Model):
     """Singleton — une seule ligne en base"""
     nom_plateforme = models.CharField(max_length=100, default='e-Signification Bénin')
@@ -45,6 +77,30 @@ class ConfigurationPlateforme(models.Model):
     yousign_webhook_secret_chiffre = models.CharField(max_length=500, blank=True,
         help_text='Secret webhook Yousign pour valider les callbacks')
 
+    # Kkiapay — paiement des crédits
+    kkiapay_active = models.BooleanField(default=False)
+    kkiapay_sandbox = models.BooleanField(default=True)
+    kkiapay_public_key_chiffre = models.CharField(max_length=500, blank=True)
+    kkiapay_private_key_chiffre = models.CharField(max_length=500, blank=True)
+    kkiapay_secret_chiffre = models.CharField(max_length=500, blank=True)
+
+    # Tarification crédits : 1 crédit débité à l'envoi, remboursement partiel selon la réponse
+    prix_credit_fcfa = models.PositiveIntegerField(
+        default=2000, help_text='Prix d\'achat d\'un crédit en FCFA',
+    )
+    credit_signification_reussie = models.DecimalField(
+        max_digits=6, decimal_places=2, default=1,
+        help_text='Crédit débité à l\'envoi (et conservé si le justiciable accepte)',
+    )
+    credit_signification_refusee = models.DecimalField(
+        max_digits=6, decimal_places=2, default=0.5,
+        help_text='Coût net si le justiciable refuse (remboursement = débit − ce montant)',
+    )
+    credit_signification_annulee = models.DecimalField(
+        max_digits=6, decimal_places=2, default=0.25,
+        help_text='Coût net si annulation (remboursement = débit − ce montant)',
+    )
+
     class Meta:
         verbose_name = 'Configuration plateforme'
 
@@ -85,6 +141,56 @@ class TexteLegal(models.Model):
 
     def __str__(self):
         return f"{self.get_type_texte_display()} ({self.langue})"
+
+
+class AcceptationTexteLegal(models.Model):
+    """Preuve immuable de l'acceptation des CGU et de la politique de confidentialité."""
+
+    CONTEXTE_INSCRIPTION_HUISSIER = 'inscription_huissier'
+    CONTEXTE_INSCRIPTION_JUSTICIABLE = 'inscription_justiciable'
+    CONTEXTE_INSCRIPTION_CLERC = 'inscription_clerc'
+    CONTEXTE_REACCEPTATION = 'reacceptation_connexion'
+    CONTEXTE_CHOICES = [
+        (CONTEXTE_INSCRIPTION_HUISSIER, 'Inscription huissier'),
+        (CONTEXTE_INSCRIPTION_JUSTICIABLE, 'Inscription justiciable'),
+        (CONTEXTE_INSCRIPTION_CLERC, 'Inscription clerc'),
+        (CONTEXTE_REACCEPTATION, 'Réacceptation à la connexion'),
+    ]
+
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)
+    user = models.ForeignKey(
+        'accounts.User', on_delete=models.CASCADE, related_name='acceptations_textes_legaux',
+    )
+    texte_legal = models.ForeignKey(
+        TexteLegal, on_delete=models.PROTECT, null=True, blank=True, related_name='acceptations',
+    )
+    type_texte = models.CharField(max_length=20, choices=TexteLegal.TYPE_CHOICES)
+    version = models.CharField(max_length=20)
+    langue = models.CharField(max_length=5)
+    hash_contenu = models.CharField(max_length=64, help_text='Empreinte SHA-256 du contenu accepté')
+    contexte = models.CharField(max_length=30, choices=CONTEXTE_CHOICES)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    date_acceptation = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Acceptation de texte légal'
+        verbose_name_plural = 'Acceptations de textes légaux'
+        ordering = ['-date_acceptation']
+        indexes = [
+            models.Index(fields=['user', 'type_texte', '-date_acceptation']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} — {self.type_texte} v{self.version} — {self.date_acceptation:%d/%m/%Y %H:%M}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and AcceptationTexteLegal.objects.filter(pk=self.pk).exists():
+            return
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        pass
 
 
 class ModeleEmail(models.Model):

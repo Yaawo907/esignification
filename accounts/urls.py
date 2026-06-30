@@ -13,4 +13,5 @@ urlpatterns = [
     path('recuperation/', views.recuperation_compte, name='recuperation_compte'),
     path('reinitialiser-mdp/', views.reinitialiser_mdp, name='reinitialiser_mdp'),
     path('inscription/clerc/', views.inscription_clerc, name='inscription_clerc'),
+    path('reaccepter-textes-legaux/', views.reaccepter_textes_legaux, name='reaccepter_textes_legaux'),
 ]
