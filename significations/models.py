@@ -136,6 +136,21 @@ class ReponseJusticiable(models.Model):
     def __str__(self):
         return f"Réponse — {self.signification.reference}"
 
+    def enregistrer_texte(self, texte_clair: str) -> None:
+        from securite.chiffrement import chiffrer_texte
+        self.texte_reponse = chiffrer_texte(texte_clair) if texte_clair else ''
+
+    @property
+    def texte_clair(self) -> str:
+        if not self.texte_reponse:
+            return ''
+        from securite.chiffrement import dechiffrer_texte
+        try:
+            return dechiffrer_texte(self.texte_reponse)
+        except Exception:
+            from html import unescape
+            return unescape(self.texte_reponse)
+
 
 class RelanceSignification(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)

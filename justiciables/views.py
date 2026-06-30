@@ -268,16 +268,17 @@ def envoyer_reponse(request, uuid):
             annexe_nom = escape(fichier.name)
             annexe_hash = hash_fichier(annexe_bytes)
 
-        texte_stocke = escape(texte) if texte else ''
         hash_contenu = hashlib.sha256(texte.encode('utf-8')).hexdigest() if texte else ''
 
-        reponse = ReponseJusticiable.objects.create(
+        reponse = ReponseJusticiable(
             signification=sig,
-            texte_reponse=texte_stocke,
             hash_contenu=hash_contenu,
             nom_fichier_annexe=annexe_nom,
             hash_annexe=annexe_hash,
         )
+        if texte:
+            reponse.enregistrer_texte(texte)
+        reponse.save()
 
         pdf_bytes = None
         if texte:

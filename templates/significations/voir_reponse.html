@@ -109,10 +109,10 @@
           {% endif %}
         </div>
 
-        {% if reponse.texte_reponse %}
+        {% if reponse.texte_clair %}
         <div style="margin-bottom:20px;">
           <div style="font-size:11px; color:var(--text-light); margin-bottom:8px;">Texte de la réponse</div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 18px; font-size:13px; line-height:1.6; white-space:pre-wrap;">{{ reponse.texte_reponse }}</div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 18px; font-size:13px; line-height:1.6; white-space:pre-wrap;">{{ reponse.texte_clair }}</div>
         </div>
         {% endif %}
 
@@ -129,7 +129,7 @@
             <div>
               <div style="font-weight:600; font-size:14px;">{{ reponse.nom_fichier_reponse|default:"Document de réponse" }}</div>
               <div style="font-size:12px; color:var(--text-secondary);">
-                {% if reponse.texte_reponse %}
+                {% if reponse.texte_clair %}
                   PDF officiel généré par la plateforme — imprimable pour production devant juridiction
                 {% else %}
                   Document joint par le justiciable
