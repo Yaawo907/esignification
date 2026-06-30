@@ -438,6 +438,7 @@
   align-items: center;
   justify-content: center;
   cursor: move;
+  touch-action: none;
 }
 .yousign-sig-marker span {
   font-size: 10px;
@@ -460,6 +461,20 @@
   cursor: nwse-resize;
   box-shadow: 0 1px 3px rgba(0,0,0,.2);
   z-index: 2;
+  touch-action: none;
+}
+@media (max-width: 768px) {
+  .yousign-sig-resize-handle {
+    width: 32px;
+    height: 32px;
+    right: -10px;
+    bottom: -10px;
+    border-radius: 50%;
+    border-width: 3px;
+  }
+  .yousign-sig-marker span {
+    font-size: 9px;
+  }
 }
 </style>
 {% endblock %}

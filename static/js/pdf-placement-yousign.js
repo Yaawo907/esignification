@@ -132,10 +132,22 @@
     };
   }
 
+  function getEventClientXY(e) {
+    if (e.touches && e.touches.length) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    if (e.changedTouches && e.changedTouches.length) {
+      return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
   function onDragMove(e) {
     if (!state.drag || !state.placement) return;
+    if (e.cancelable) e.preventDefault();
     var p = state.placement;
-    var delta = screenToPdfDelta(e.clientX - state.drag.startX, e.clientY - state.drag.startY);
+    var xy = getEventClientXY(e);
+    var delta = screenToPdfDelta(xy.x - state.drag.startX, xy.y - state.drag.startY);
 
     if (state.drag.type === 'resize') {
       var size = clampSize(
@@ -166,27 +178,31 @@
     state.drag = null;
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', onDragEnd);
+    document.removeEventListener('touchmove', onDragMove);
+    document.removeEventListener('touchend', onDragEnd);
+    document.removeEventListener('touchcancel', onDragEnd);
     emitChange();
   }
 
-  function startDrag(type, e, extra) {
+  function startDrag(type, e) {
     e.preventDefault();
     e.stopPropagation();
     if (!state.placement) return;
+    var xy = getEventClientXY(e);
     state.drag = {
       type: type,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: xy.x,
+      startY: xy.y,
       startW: state.placement.width,
       startH: state.placement.height,
       startPdfX: state.placement.x,
       startPdfY: state.placement.y,
     };
-    if (extra) {
-      Object.keys(extra).forEach(function (k) { state.drag[k] = extra[k]; });
-    }
     document.addEventListener('mousemove', onDragMove);
     document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchmove', onDragMove, { passive: false });
+    document.addEventListener('touchend', onDragEnd);
+    document.addEventListener('touchcancel', onDragEnd);
   }
 
   function onResizeStart(e) {
@@ -231,12 +247,13 @@
   }
 
   function onCanvasClick(e) {
-    if (!state.pageViewport) return;
+    if (!state.pageViewport || state.drag) return;
     var canvas = $('yousign-pdf-canvas');
     if (!canvas) return;
     var rect = canvas.getBoundingClientRect();
-    var clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
-    var clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
+    var xy = getEventClientXY(e);
+    var clickX = (xy.x - rect.left) * (canvas.width / rect.width);
+    var clickY = (xy.y - rect.top) * (canvas.height / rect.height);
     var pdfX = clickX / state.scale;
     var pdfY = clickY / state.scale;
     var topLeft = clampPosition(
@@ -337,11 +354,13 @@
     var marker = $('yousign-sig-marker');
     if (marker) {
       marker.addEventListener('mousedown', onMoveStart);
+      marker.addEventListener('touchstart', onMoveStart, { passive: false });
     }
 
     var handle = document.querySelector('.yousign-sig-resize-handle');
     if (handle) {
       handle.addEventListener('mousedown', onResizeStart);
+      handle.addEventListener('touchstart', onResizeStart, { passive: false });
     }
 
     var prev = $('yousign-page-prev');
