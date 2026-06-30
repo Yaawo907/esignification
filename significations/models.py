@@ -113,11 +113,21 @@ class CertificatSignification(models.Model):
 class ReponseJusticiable(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
     signification = models.OneToOneField(Signification, on_delete=models.PROTECT, related_name='reponse')
+    texte_reponse = models.TextField(blank=True, verbose_name="Texte de la réponse")
     fichier_reponse_chiffre = models.BinaryField(null=True, blank=True)
     nom_fichier_reponse = models.CharField(max_length=255, blank=True)
     date_envoi_justiciable = models.DateTimeField(auto_now_add=True)
     date_reception_huissier = models.DateTimeField(null=True, blank=True)
+    hash_contenu = models.CharField(max_length=64, blank=True)
     hash_reponse = models.CharField(max_length=64, blank=True)
+    nom_fichier_annexe = models.CharField(max_length=255, blank=True)
+    hash_annexe = models.CharField(max_length=64, blank=True)
+    hash_merkle = models.CharField(max_length=64, blank=True)
+    chemin_merkle = models.JSONField(default=list, blank=True)
+    horodatage_certigna = models.BinaryField(null=True, blank=True)
+    lot_merkle = models.ForeignKey(
+        'administration.LotMerkle', on_delete=models.SET_NULL, null=True, blank=True,
+    )
     vue_par_huissier = models.BooleanField(default=False)
 
     class Meta:

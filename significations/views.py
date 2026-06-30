@@ -529,7 +529,10 @@ def voir_reponse(request, uuid):
         raise Http404
     if sig.statut != Signification.STATUT_REPONDU or not hasattr(sig, 'reponse'):
         raise Http404
-    reponse = sig.reponse
+    reponse = get_object_or_404(
+        ReponseJusticiable.objects.select_related('lot_merkle'),
+        signification=sig,
+    )
     if not reponse.vue_par_huissier:
         reponse.vue_par_huissier = True
         from django.utils import timezone as tz

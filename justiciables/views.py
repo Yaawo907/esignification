@@ -229,34 +229,95 @@ def confirmer_changement_email(request):
 @login_required
 @justiciable_required
 def envoyer_reponse(request, uuid):
+    import hashlib
+    from django.contrib import messages
+    from notifications.service import envoyer_reponse_huissier
+    from significations.pdf_reponse import generer_pdf_reponse, fusionner_annexe_pdf
+
     profil = request.user.profil_justiciable
     sig = get_object_or_404(Signification, uuid=uuid, justiciable=profil)
     if not sig.necessite_reponse or sig.statut not in ['acceptee']:
         raise Http404
+    if hasattr(sig, 'reponse'):
+        messages.warning(request, "Une réponse a déjà été envoyée pour cette signification.")
+        return redirect('justiciables:significations')
+
     if request.method == 'POST':
+        texte = request.POST.get('texte_reponse', '').strip()
         fichier = request.FILES.get('fichier_reponse')
+
+        if not texte and not fichier:
+            messages.error(request, "Saisissez votre réponse ou joignez un document PDF.")
+            return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
+
+        if texte and len(texte) < 10:
+            messages.error(request, "Votre réponse doit contenir au moins 10 caractères.")
+            return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
+
+        annexe_bytes = None
+        annexe_nom = ''
+        annexe_hash = ''
         if fichier:
-            contenu = fichier.read()
-            hash_rep = hash_fichier(contenu)
-            contenu_chiffre = chiffrer_fichier(contenu)
-            ReponseJusticiable.objects.create(
-                signification=sig,
-                fichier_reponse_chiffre=contenu_chiffre,
-                nom_fichier_reponse=escape(fichier.name),
-                hash_reponse=hash_rep,
+            if not fichier.name.lower().endswith('.pdf'):
+                messages.error(request, "Seuls les fichiers PDF sont acceptés en annexe.")
+                return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
+            annexe_bytes = fichier.read()
+            if len(annexe_bytes) > 20 * 1024 * 1024:
+                messages.error(request, "L'annexe ne doit pas dépasser 20 Mo.")
+                return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig, 'texte_saisi': texte})
+            annexe_nom = escape(fichier.name)
+            annexe_hash = hash_fichier(annexe_bytes)
+
+        texte_stocke = escape(texte) if texte else ''
+        hash_contenu = hashlib.sha256(texte.encode('utf-8')).hexdigest() if texte else ''
+
+        reponse = ReponseJusticiable.objects.create(
+            signification=sig,
+            texte_reponse=texte_stocke,
+            hash_contenu=hash_contenu,
+            nom_fichier_annexe=annexe_nom,
+            hash_annexe=annexe_hash,
+        )
+
+        pdf_bytes = None
+        if texte:
+            pdf_bytes = generer_pdf_reponse(
+                sig, reponse, texte,
+                annexe_nom=annexe_nom, annexe_hash=annexe_hash,
             )
-            sig.statut = Signification.STATUT_REPONDU
-            sig.save(update_fields=['statut'])
-            # Notifier huissier
-            from notifications.service import envoyer_email
-            from administration.models import ConfigurationPlateforme
-            config = ConfigurationPlateforme.get()
-            corps = f"<p>Le justiciable <strong>{profil.nom_complet}</strong> a envoyé une réponse pour la signification <strong>{sig.reference}</strong>. Connectez-vous pour la consulter.</p>"
-            envoyer_email(sig.huissier.user.email, f"Réponse reçue — {sig.reference}", corps)
-            journaliser(request.user, 'reponse_envoyee', 'Signification', sig.uuid, request=request)
-            from django.contrib import messages
+            if annexe_bytes:
+                pdf_bytes = fusionner_annexe_pdf(pdf_bytes, annexe_bytes)
+            reponse.fichier_reponse_chiffre = chiffrer_fichier(pdf_bytes)
+            reponse.nom_fichier_reponse = f"reponse_{sig.reference}.pdf"
+            reponse.hash_reponse = hash_fichier(pdf_bytes)
+            reponse.save(update_fields=[
+                'fichier_reponse_chiffre', 'nom_fichier_reponse', 'hash_reponse',
+            ])
+        elif annexe_bytes:
+            reponse.fichier_reponse_chiffre = chiffrer_fichier(annexe_bytes)
+            reponse.nom_fichier_reponse = annexe_nom
+            reponse.hash_reponse = hash_fichier(annexe_bytes)
+            reponse.save(update_fields=[
+                'fichier_reponse_chiffre', 'nom_fichier_reponse', 'hash_reponse',
+            ])
+            pdf_bytes = annexe_bytes
+
+        sig.statut = Signification.STATUT_REPONDU
+        sig.save(update_fields=['statut'])
+
+        if pdf_bytes:
+            envoyer_reponse_huissier(sig, reponse, pdf_bytes)
+        journaliser(request.user, 'reponse_envoyee', 'Signification', sig.uuid, request=request)
+
+        if texte:
+            msg = "Votre réponse a été convertie en PDF officiel et transmise à l'huissier."
+            if annexe_nom:
+                msg += f" L'annexe « {annexe_nom} » a été fusionnée au document."
+            messages.success(request, msg)
+        else:
             messages.success(request, "Votre réponse a été envoyée à l'huissier.")
-            return redirect('justiciables:tableau_de_bord')
+        return redirect('justiciables:tableau_de_bord')
+
     return render(request, 'justiciables/envoyer_reponse.html', {'sig': sig})
 
 

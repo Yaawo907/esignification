@@ -82,24 +82,31 @@ def _generer_constat_non_reception(sig):
 
 
 def executer_lot_merkle():
-    """Lot Merkle quotidien — horodatage Certigna"""
+    """Lot Merkle quotidien — horodatage Certigna (certificats + réponses)."""
     from administration.models import ConfigurationPlateforme, LotMerkle
-    from significations.models import CertificatSignification
+    from significations.models import CertificatSignification, ReponseJusticiable
     from securite.merkle import construire_arbre_merkle, chemin_preuve
-    import hashlib
+
     config = ConfigurationPlateforme.get()
     today = timezone.now().date()
     if LotMerkle.objects.filter(date_lot=today).exists():
         logger.info(f"Lot Merkle {today} déjà traité.")
         return
-    # Récupérer les certs du jour sans lot
+
     certs = list(CertificatSignification.objects.filter(
-        date_generation__date=today, lot_merkle__isnull=True
+        date_generation__date=today, lot_merkle__isnull=True,
     ))
-    if not certs:
-        logger.info("Aucun certificat à horodater aujourd'hui.")
+    reponses = list(ReponseJusticiable.objects.filter(
+        date_envoi_justiciable__date=today,
+        lot_merkle__isnull=True,
+    ).exclude(hash_reponse=''))
+
+    items = [(c.hash_certificat, c) for c in certs] + [(r.hash_reponse, r) for r in reponses]
+    if not items:
+        logger.info("Aucun certificat ni réponse à horodater aujourd'hui.")
         return
-    feuilles = [c.hash_certificat for c in certs]
+
+    feuilles = [h for h, _ in items]
     hash_racine, _ = construire_arbre_merkle(feuilles)
     statut = 'local'
     jeton = None
@@ -109,21 +116,29 @@ def executer_lot_merkle():
             statut = 'certifie'
             config.certigna_jetons_restants = max(0, config.certigna_jetons_restants - 1)
             config.save(update_fields=['certigna_jetons_restants'])
+
     lot = LotMerkle.objects.create(
         date_lot=today,
         hash_racine=hash_racine,
         jeton_certigna=jeton,
-        nb_actes_couverts=len(certs),
+        nb_actes_couverts=len(items),
         statut=statut,
     )
-    # Associer chaque cert au lot avec son chemin de preuve
-    for idx, cert in enumerate(certs):
+
+    for idx, (_, obj) in enumerate(items):
         preuve = chemin_preuve(feuilles, idx)
-        cert.lot_merkle = lot
-        cert.hash_merkle = hash_racine
-        cert.chemin_merkle = preuve
-        cert.save(update_fields=['lot_merkle', 'hash_merkle', 'chemin_merkle'])
-    logger.info(f"Lot Merkle {today} : {len(certs)} certs, statut={statut}")
+        obj.lot_merkle = lot
+        obj.hash_merkle = hash_racine
+        obj.chemin_merkle = preuve
+        update_fields = ['lot_merkle', 'hash_merkle', 'chemin_merkle']
+        if jeton and hasattr(obj, 'horodatage_certigna'):
+            obj.horodatage_certigna = jeton
+            update_fields.append('horodatage_certigna')
+        obj.save(update_fields=update_fields)
+
+    logger.info(
+        f"Lot Merkle {today} : {len(certs)} cert(s), {len(reponses)} réponse(s), statut={statut}",
+    )
     # Alerte si jetons bas
     if config.certigna_active and config.certigna_jetons_restants <= config.certigna_seuil_alerte_jetons:
         from notifications.service import envoyer_email

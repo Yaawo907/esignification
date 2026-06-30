@@ -232,6 +232,64 @@ Ce certificat atteste que l'acte a été remis électroniquement à la date et h
     envoyer_email(justiciable.email_domicile, sujet, corps, corps_texte, pieces_jointes)
 
 
+def envoyer_reponse_huissier(signification, reponse, pdf_data: bytes, langue: str = 'fr'):
+    """Notifie l'huissier avec le PDF officiel de réponse en pièce jointe."""
+    from django.utils import timezone as tz
+    from administration.models import ConfigurationPlateforme
+
+    config = ConfigurationPlateforme.get()
+    huissier = signification.huissier
+    justiciable = signification.justiciable
+
+    date_envoi = reponse.date_envoi_justiciable
+    if tz.is_aware(date_envoi):
+        date_envoi = tz.localtime(date_envoi)
+    date_envoi_fmt = date_envoi.strftime('%d/%m/%Y à %Hh%Mm%Ss')
+
+    sujet = f"Réponse reçue — {signification.reference}"
+    nom_pdf = reponse.nom_fichier_reponse or f"reponse_{signification.reference}.pdf"
+    pieces_jointes = [(nom_pdf, pdf_data, 'application/pdf')] if pdf_data else []
+
+    mention_annexe = ''
+    if reponse.nom_fichier_annexe:
+        mention_annexe = (
+            f"<p>Une pièce jointe (<em>{reponse.nom_fichier_annexe}</em>) "
+            f"a été fusionnée au document officiel.</p>"
+        )
+
+    mention_pj = (
+        f"<p>Le document officiel de réponse est joint à cet email au format <strong>PDF</strong> "
+        f"(<em>{nom_pdf}</em>) — imprimable pour production devant juridiction.</p>"
+        if pieces_jointes else
+        "<p>Connectez-vous à la plateforme pour consulter la réponse.</p>"
+    )
+
+    corps = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+      <h2 style="color:#1a3c6e;">Réponse du justiciable</h2>
+      <p>Le justiciable <strong>{justiciable.nom_complet}</strong> a transmis une réponse
+      pour la signification <strong>{signification.reference}</strong>.</p>
+      <p>Date et heure d'envoi : <strong>{date_envoi_fmt}</strong></p>
+      {mention_annexe}
+      {mention_pj}
+      <p style="color:#888;font-size:12px;">Consultez également la réponse depuis votre espace sur {config.nom_plateforme}.</p>
+    </div>"""
+
+    corps_texte = f"""Réponse du justiciable
+
+Justiciable : {justiciable.nom_complet}
+Signification : {signification.reference}
+Date d'envoi : {date_envoi_fmt}
+"""
+    if reponse.nom_fichier_annexe:
+        corps_texte += f"Annexe fusionnée : {reponse.nom_fichier_annexe}\n"
+    if pieces_jointes:
+        corps_texte += f"\nLe PDF officiel est joint ({nom_pdf}).\n"
+    corps_texte += f"\nConsultez votre espace sur {config.nom_plateforme}.\n"
+
+    return envoyer_email(huissier.user.email, sujet, corps, corps_texte, pieces_jointes)
+
+
 def envoyer_recuperation_mdp(email: str, token_brut: str, langue: str = 'fr'):
     from django.conf import settings
     lien = f"{settings.SITE_URL}/reinitialiser-mdp/?token={token_brut}"

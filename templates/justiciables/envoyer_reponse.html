@@ -40,7 +40,6 @@
 
     <div class="content-area" style="max-width:640px;">
 
-      <!-- Récapitulatif de la signification -->
       <div class="card" style="margin-bottom:16px; padding:18px 22px;">
         <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px;">
           Signification concernée
@@ -71,54 +70,69 @@
         </div>
       </div>
 
-      <!-- Formulaire de réponse -->
       <div class="card" style="padding:20px 24px;">
         <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px;">
           Votre réponse
         </div>
 
         <div style="background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:12px 16px; font-size:13px; color:#134e3a; margin-bottom:18px;">
-          <strong>ℹ Important :</strong> La date et l'heure d'envoi de votre réponse seront horodatées et transmises à l'huissier. Joignez le document demandé en format PDF.
+          <strong>ℹ Important :</strong> Saisissez votre réponse ci-dessous. Elle sera automatiquement convertie en
+          <strong>document PDF officiel horodaté</strong>, avec vos informations d'identification et les empreintes de sécurité,
+          puis transmise à l'huissier pour impression et production devant les juridictions.
         </div>
 
         <form method="post" enctype="multipart/form-data" novalidate id="form-reponse">
           {% csrf_token %}
 
           <div class="form-group">
-            <label class="form-label" for="fichier_reponse">Document de réponse (PDF) *</label>
-
-            <!-- Zone de drop stylisée -->
-            <div id="drop-zone" style="
-              border:2px dashed #a7d7c0; border-radius:10px; padding:28px 20px;
-              text-align:center; cursor:pointer; transition:border-color .2s, background .2s;
-              background:#fafffe;"
-              onclick="document.getElementById('fichier_reponse').click()"
-              ondragover="event.preventDefault(); this.style.background='#f0fdf4';"
-              ondragleave="this.style.background='#fafffe';"
-              ondrop="handleDrop(event)">
-              <div style="font-size:28px; margin-bottom:8px;">📄</div>
-              <div style="font-size:14px; font-weight:600; color:#134e3a;">Cliquez ou glissez votre fichier ici</div>
-              <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">PDF uniquement — max 20 Mo</div>
-              <input type="file" name="fichier_reponse" id="fichier_reponse"
-                accept=".pdf" style="display:none;" required
-                onchange="previewFichier(this)">
-            </div>
-
-            <!-- Aperçu du fichier sélectionné -->
-            <div id="fichier-preview" style="display:none; margin-top:10px; background:#f0fdf4; border:1px solid #a7d7c0; border-radius:8px; padding:12px 16px; display:none; align-items:center; gap:10px;">
-              <div style="font-size:24px; flex-shrink:0;">📄</div>
-              <div style="flex:1; min-width:0;">
-                <div id="fichier-nom" style="font-weight:600; font-size:13px; color:#134e3a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
-                <div id="fichier-taille" style="font-size:11px; color:var(--text-secondary); margin-top:2px;"></div>
-              </div>
-              <button type="button" onclick="retirerFichier()" style="background:none; border:none; cursor:pointer; color:var(--text-light); font-size:16px;" title="Retirer">✕</button>
-            </div>
+            <label class="form-label" for="texte_reponse">
+              Contenu de votre réponse <span class="required">*</span>
+            </label>
+            <textarea name="texte_reponse" id="texte_reponse" class="form-input" rows="10"
+              placeholder="Rédigez ici votre réponse à la signification reçue…"
+              minlength="10" required
+              style="resize:vertical; min-height:160px; line-height:1.5;">{{ texte_saisi|default:'' }}</textarea>
+            <div class="form-hint">Minimum 10 caractères. Votre réponse sera intégrée telle quelle dans le PDF officiel.</div>
+            <div id="compteur-chars" style="font-size:11px; color:var(--text-light); margin-top:4px; text-align:right;">0 caractère</div>
           </div>
+
+          <details style="margin-top:8px; margin-bottom:16px;" open>
+            <summary style="font-size:13px; color:var(--text-secondary); cursor:pointer; user-select:none;">
+              Joindre une annexe PDF (optionnel)
+            </summary>
+            <div style="margin-top:12px;">
+              <div class="form-hint" style="margin-bottom:10px;">
+                Vous pouvez joindre un document complémentaire. Il sera fusionné au PDF officiel généré à partir de votre texte.
+              </div>
+              <div id="drop-zone" style="
+                border:2px dashed #d0dff5; border-radius:10px; padding:20px 16px;
+                text-align:center; cursor:pointer; background:#fafffe;"
+                onclick="document.getElementById('fichier_reponse').click()"
+                ondragover="event.preventDefault(); this.style.background='#f5f8ff';"
+                ondragleave="this.style.background='#fafffe';"
+                ondrop="handleDrop(event)">
+                <div style="font-size:22px; margin-bottom:6px;">📄</div>
+                <div style="font-size:13px; font-weight:600; color:var(--text-secondary);">Cliquez ou glissez un PDF ici</div>
+                <div style="font-size:11px; color:var(--text-light); margin-top:4px;">PDF uniquement — max 20 Mo</div>
+                <input type="file" name="fichier_reponse" id="fichier_reponse"
+                  accept=".pdf" style="display:none;"
+                  onchange="previewFichier(this)">
+              </div>
+              <div id="fichier-preview" style="display:none; margin-top:10px; background:#f5f8ff; border:1px solid #d0dff5; border-radius:8px; padding:12px 16px; align-items:center; gap:10px;">
+                <div style="font-size:22px; flex-shrink:0;">📄</div>
+                <div style="flex:1; min-width:0;">
+                  <div id="fichier-nom" style="font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+                  <div id="fichier-taille" style="font-size:11px; color:var(--text-secondary); margin-top:2px;"></div>
+                </div>
+                <button type="button" onclick="retirerFichier()" style="background:none; border:none; cursor:pointer; color:var(--text-light); font-size:16px;" title="Retirer">✕</button>
+              </div>
+            </div>
+          </details>
 
           <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
             <a href="{% url 'justiciables:significations' %}" class="btn btn-ghost">Annuler</a>
-            <button type="submit" id="btn-envoyer" class="btn btn-primary btn-spinner" data-loading="Envoi en cours…" disabled style="opacity:.5; cursor:not-allowed;">
-              ↩ Informer l'huissier
+            <button type="submit" id="btn-envoyer" class="btn btn-primary btn-spinner" data-loading="Envoi en cours…">
+              ↩ Envoyer ma réponse
             </button>
           </div>
         </form>
@@ -127,25 +141,39 @@
     </div>
   </main>
 </div>
+{% endblock %}
 
 {% block extra_scripts %}
 <script>
 'use strict';
 
+(function() {
+  var textarea = document.getElementById('texte_reponse');
+  var compteur = document.getElementById('compteur-chars');
+  if (!textarea || !compteur) return;
+
+  function updateCompteur() {
+    var n = textarea.value.length;
+    compteur.textContent = n + ' caractère' + (n !== 1 ? 's' : '');
+    compteur.style.color = n > 0 && n < 10 ? 'var(--red, #e53e3e)' : 'var(--text-light)';
+  }
+
+  textarea.addEventListener('input', updateCompteur);
+  updateCompteur();
+})();
+
 function previewFichier(input) {
   var preview = document.getElementById('fichier-preview');
   var nomEl = document.getElementById('fichier-nom');
   var tailleEl = document.getElementById('fichier-taille');
-  var btn = document.getElementById('btn-envoyer');
   var dropZone = document.getElementById('drop-zone');
 
   if (input.files && input.files[0]) {
     var f = input.files[0];
     if (nomEl) nomEl.textContent = f.name;
     if (tailleEl) tailleEl.textContent = (f.size / 1024 / 1024).toFixed(2) + ' Mo';
-    if (preview) { preview.style.display = 'flex'; }
-    if (dropZone) { dropZone.style.display = 'none'; }
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+    if (preview) preview.style.display = 'flex';
+    if (dropZone) dropZone.style.display = 'none';
   }
 }
 
@@ -153,11 +181,9 @@ function retirerFichier() {
   var input = document.getElementById('fichier_reponse');
   var preview = document.getElementById('fichier-preview');
   var dropZone = document.getElementById('drop-zone');
-  var btn = document.getElementById('btn-envoyer');
   if (input) input.value = '';
   if (preview) preview.style.display = 'none';
   if (dropZone) dropZone.style.display = 'block';
-  if (btn) { btn.disabled = true; btn.style.opacity = '.5'; btn.style.cursor = 'not-allowed'; }
 }
 
 function handleDrop(event) {
@@ -168,7 +194,6 @@ function handleDrop(event) {
   if (files && files[0]) {
     var input = document.getElementById('fichier_reponse');
     if (input) {
-      /* Créer un DataTransfer pour affecter les fichiers à l'input */
       var dt = new DataTransfer();
       dt.items.add(files[0]);
       input.files = dt.files;
@@ -178,6 +203,3 @@ function handleDrop(event) {
 }
 </script>
 {% endblock %}
-
-{% endblock %}
-                              
