@@ -94,3 +94,19 @@ def valider_placement_yousign(pdf_bytes: bytes, placement: dict) -> dict:
         'width': width,
         'height': height,
     }
+
+
+def sauvegarder_dimensions_profil_huissier(huissier, placement: dict) -> None:
+    """Mémorise les dimensions de zone Yousign pour les prochains envois."""
+    from huissiers.models import ParametreSignatureHuissier
+
+    width = placement.get('width', YOUSIGN_SIG_WIDTH_DEFAULT)
+    height = placement.get('height', YOUSIGN_SIG_HEIGHT_DEFAULT)
+    if not (YOUSIGN_SIG_WIDTH_MIN <= width <= YOUSIGN_SIG_WIDTH_MAX):
+        return
+    if not (YOUSIGN_SIG_HEIGHT_MIN <= height <= YOUSIGN_SIG_HEIGHT_MAX):
+        return
+    params, _ = ParametreSignatureHuissier.objects.get_or_create(huissier=huissier)
+    params.yousign_zone_width = width
+    params.yousign_zone_height = height
+    params.save(update_fields=['yousign_zone_width', 'yousign_zone_height'])

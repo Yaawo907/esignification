@@ -38,6 +38,17 @@
       <!-- ── 3. Cachet simple ── -->
       {% include 'huissiers/_bloc_signature.html' with titre="Cachet simple" sous_titre="Tampon de l'étude seul, sans signature" action="enregistrer_cachet_simple" effacer_action="effacer_cachet_simple" champ_b64="cachet_simple_b64" champ_label="cachet_simple_label" label_actuel=params.cachet_simple_label b64_actuel=params.cachet_simple_b64 slug="cachet_simple" %}
 
+      <div class="card" style="margin-top:20px; padding:16px 20px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text-light); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;">
+          Zone signature électronique (Yousign)
+        </div>
+        <p style="font-size:13px; color:var(--text-secondary); margin:0;">
+          Dimensions par défaut du cadre de signature :
+          <strong>{{ params.yousign_zone_width }} × {{ params.yousign_zone_height }} pt</strong>.
+          Elles sont mises à jour automatiquement lorsque vous validez une signification avec Yousign.
+        </p>
+      </div>
+
     </div>
   </main>
 </div>

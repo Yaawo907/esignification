@@ -51,6 +51,9 @@ class ParametreSignatureHuissier(models.Model):
     # Cachet seul (tampon de l'étude)
     cachet_simple_b64 = models.TextField(blank=True)
     cachet_simple_label = models.CharField(max_length=80, default='Cachet simple')
+    # Dimensions par défaut de la zone Yousign (mises à jour à chaque envoi validé)
+    yousign_zone_width = models.PositiveIntegerField(default=120)
+    yousign_zone_height = models.PositiveIntegerField(default=60)
 
     date_modification = models.DateTimeField(auto_now=True)
 

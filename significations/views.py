@@ -166,6 +166,9 @@ def envoyer_signification(request):
             messages.success(request, f"Signification {sig.reference} envoyée avec succès.")
 
         debiter_envoi_signification(sig, request.user)
+        if yousign_actif and placement_yousign:
+            from .yousign_placement import sauvegarder_dimensions_profil_huissier
+            sauvegarder_dimensions_profil_huissier(huissier, placement_yousign)
         return redirect('huissiers:tableau_de_bord')
     # Charger les signatures enregistrées de l'huissier
     from huissiers.models import ParametreSignatureHuissier

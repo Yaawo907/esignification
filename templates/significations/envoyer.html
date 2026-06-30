@@ -229,14 +229,14 @@
           </div>
           <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
             Parcourez les pages du PDF et <strong>cliquez à l'endroit</strong> où vous souhaitez apposer votre signature électronique.
-            Un cadre vert indique l'emplacement retenu.
+            Un cadre vert indique l'emplacement retenu — <strong>glissez le cadre</strong> pour le déplacer, ou la poignée en bas à droite pour ajuster sa taille.
           </p>
 
           <input type="hidden" name="yousign_sig_page" id="yousign_sig_page" value="">
           <input type="hidden" name="yousign_sig_x" id="yousign_sig_x" value="">
           <input type="hidden" name="yousign_sig_y" id="yousign_sig_y" value="">
-          <input type="hidden" name="yousign_sig_width" id="yousign_sig_width" value="120">
-          <input type="hidden" name="yousign_sig_height" id="yousign_sig_height" value="60">
+          <input type="hidden" name="yousign_sig_width" id="yousign_sig_width" value="{% if params_sig %}{{ params_sig.yousign_zone_width }}{% else %}120{% endif %}">
+          <input type="hidden" name="yousign_sig_height" id="yousign_sig_height" value="{% if params_sig %}{{ params_sig.yousign_zone_height }}{% else %}60{% endif %}">
 
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
             <div style="display:flex; align-items:center; gap:8px;">
@@ -256,6 +256,7 @@
               <canvas id="yousign-pdf-canvas" class="yousign-pdf-canvas" aria-label="Aperçu du PDF — cliquez pour placer la signature"></canvas>
               <div id="yousign-sig-marker" class="yousign-sig-marker" style="display:none;" aria-hidden="true">
                 <span>Signature</span>
+                <div class="yousign-sig-resize-handle" title="Redimensionner"></div>
               </div>
             </div>
           </div>
@@ -407,11 +408,12 @@
   border: 2px dashed #15803d;
   background: rgba(21, 128, 61, 0.12);
   border-radius: 4px;
-  pointer-events: none;
+  pointer-events: auto;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: move;
 }
 .yousign-sig-marker span {
   font-size: 10px;
@@ -419,6 +421,21 @@
   color: #15803d;
   text-transform: uppercase;
   letter-spacing: .04em;
+  pointer-events: none;
+  user-select: none;
+}
+.yousign-sig-resize-handle {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 14px;
+  height: 14px;
+  background: #15803d;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  cursor: nwse-resize;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  z-index: 2;
 }
 </style>
 {% endblock %}
@@ -659,11 +676,13 @@ validerFormulaire();
 </script>
 {% if yousign_actif %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="{% static 'js/pdf-placement-yousign.js' %}?v=1"></script>
+<script src="{% static 'js/pdf-placement-yousign.js' %}?v=4"></script>
 <script>
 'use strict';
 if (window.YousignPdfPlacement) {
   YousignPdfPlacement.init({
+    defaultWidth: {% if params_sig %}{{ params_sig.yousign_zone_width }}{% else %}120{% endif %},
+    defaultHeight: {% if params_sig %}{{ params_sig.yousign_zone_height }}{% else %}60{% endif %},
     onChange: function (hasPlacement) {
       placementYousignOk = hasPlacement;
       validerFormulaire();
