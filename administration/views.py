@@ -754,7 +754,7 @@ def gestion_paiements_credits(request):
         'huissiers': huissiers,
         'commandes_recentes': CommandeCredit.objects.select_related('huissier').order_by('-date_creation')[:30],
         'mouvements_recents': MouvementCredit.objects.select_related('huissier').order_by('-date')[:40],
-        'callback_url': request.build_absolute_uri('/paiements/callback/kkiapay/'),
+        'callback_url': __import__('paiements.services.callback_urls', fromlist=['get_callback_url_kkiapay']).get_callback_url_kkiapay(request),
     })
 
 

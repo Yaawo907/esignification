@@ -7,11 +7,20 @@ from django.views.i18n import set_language
 from django.shortcuts import redirect
 from administration.views import texte_legal_public
 from administration.models import TexteLegal
+from paiements.views import callback_kkiapay
 
 
 def home(request):
     from accounts.models import User
     from django.shortcuts import render as _render
+    # Kkiapay peut rediriger vers "/" avec ?transaction_id=…
+    if request.GET.get('transaction_id') or request.GET.get('payment_id'):
+        from django.urls import reverse
+        qs = request.GET.urlencode()
+        url = reverse('paiements:callback_kkiapay')
+        if qs:
+            url = f'{url}?{qs}'
+        return redirect(url)
     if request.user.is_authenticated:
         if request.user.role == User.ADMIN:
             return redirect('/administration/')
@@ -39,6 +48,8 @@ urlpatterns = [
     path('api/', include('api.urls', namespace='api')),
     path('messagerie/', include('messagerie.urls', namespace='messagerie')),
     path('paiements/', include('paiements.urls', namespace='paiements')),
+    # Alias rétrocompatibilité (webhook Kkiapay configuré avec /paiement/ au singulier)
+    path('paiement/callback/kkiapay/', callback_kkiapay),
 ]
 
 # Fichiers media — servis par Django (DEBUG=True ou False)

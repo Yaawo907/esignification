@@ -38,6 +38,7 @@ class Signification(models.Model):
     # Fichier acte (chiffré)
     fichier_chiffre = models.BinaryField(null=True, blank=True)
     nom_fichier_original = models.CharField(max_length=255, blank=True)
+    titre_acte = models.CharField(max_length=300, blank=True, verbose_name="Titre de l'acte")
     taille_fichier = models.IntegerField(default=0)
 
     # Options

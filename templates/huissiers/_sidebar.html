@@ -14,7 +14,7 @@
       <span class="nav-icon">▦</span> Tableau de bord
     </a>
     <a href="{% url 'huissiers:significations' %}"
-       class="nav-item spinner-link {% if request.resolver_match.url_name == 'significations' or request.resolver_match.url_name == 'envoyer' or request.resolver_match.url_name == 'voir_reponse' %}active{% endif %}">
+       class="nav-item spinner-link {% if request.resolver_match.url_name == 'significations' or request.resolver_match.url_name == 'envoyer' or request.resolver_match.url_name == 'voir_reponse' or request.resolver_match.url_name == 'detail' %}active{% endif %}">
       <span class="nav-icon">✉</span> Significations
       {% if stats_en_attente %}<span class="nav-badge">{{ stats_en_attente }}</span>{% endif %}
     </a>

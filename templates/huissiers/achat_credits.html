@@ -4,6 +4,11 @@
 {% block extra_head %}
 <style>
 kkiapay-widget, [id*="kkiapay"], iframe[src*="kkiapay"] { z-index: 9000 !important; }
+.badge-statut { display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600; }
+.badge-en_attente { background:#fef3c7;color:#92400e; }
+.badge-complete { background:#d1fae5;color:#065f46; }
+.badge-echoue { background:#fee2e2;color:#991b1b; }
+.btn-sm { font-size:12px;padding:4px 10px; }
 </style>
 {% endblock %}
 {% block body %}
@@ -57,6 +62,73 @@ kkiapay-widget, [id*="kkiapay"], iframe[src*="kkiapay"] { z-index: 9000 !importa
           {% endif %}
         </div>
       </div>
+
+      {% if kkiapay_actif %}
+      <div class="card" style="margin-bottom:20px;border-color:#fbbf24;">
+        <div class="card-header"><span class="card-title">Vérification manuelle</span></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+            Si le paiement a réussi chez Kkiapay mais que vos crédits ne se mettent pas à jour
+            (souci de callback), saisissez l'identifiant de transaction affiché par Kkiapay.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="manual-tx-id">Identifiant de transaction Kkiapay</label>
+            <input type="text" id="manual-tx-id" class="form-input" placeholder="Ex. tx_abc123…" autocomplete="off">
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-verifier-manuel" onclick="verifierPaiementManuel()">
+            Vérifier et créditer
+          </button>
+          <div id="verify-result" style="margin-top:12px;font-size:13px;display:none;"></div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if commandes %}
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><span class="card-title">Mes commandes récentes</span></div>
+        <div class="card-body" style="padding:0;overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Crédits</th>
+                <th>Montant</th>
+                <th>Statut</th>
+                <th>Transaction</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in commandes %}
+              <tr>
+                <td>{{ c.date_creation|date:"d/m/Y H:i" }}</td>
+                <td>{{ c.nb_credits }}</td>
+                <td>{{ c.montant_fcfa|floatformat:0 }} FCFA</td>
+                <td>
+                  <span class="badge-statut badge-{{ c.statut }}" data-statut-cmd="{{ c.uuid }}">
+                    {{ c.get_statut_display }}
+                  </span>
+                </td>
+                <td style="font-family:monospace;font-size:11px;">
+                  {% if c.transaction_kkiapay %}{{ c.transaction_kkiapay|truncatechars:24 }}{% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if c.statut == 'en_attente' %}
+                  <button type="button" class="btn btn-ghost btn-sm js-verify-cmd"
+                          data-transaction-id="{{ c.transaction_kkiapay }}"
+                          data-commande-uuid="{{ c.uuid }}"
+                          onclick="verifierCommande(this)">
+                    Vérifier
+                  </button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
 
       {% if mouvements %}
       <div class="card">
@@ -116,6 +188,7 @@ kkiapay-widget, [id*="kkiapay"], iframe[src*="kkiapay"] { z-index: 9000 !importa
 <script>
 const PRIX_CREDIT = {{ prix_credit }};
 const CSRF = '{{ csrf_token }}';
+const VERIFY_URL = '{% url "paiements:verifier_paiement_ajax" %}';
 
 function majMontant() {
   const nb = parseInt(document.getElementById('nb-credits-input').value, 10) || 0;
@@ -124,6 +197,66 @@ function majMontant() {
 
 document.getElementById('nb-credits-input').addEventListener('input', majMontant);
 majMontant();
+
+async function appelerVerification(transactionId, commandeUuid, btn) {
+  const originalText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Vérification…'; }
+  const resultEl = document.getElementById('verify-result');
+  try {
+    const body = new URLSearchParams({ transaction_id: transactionId });
+    if (commandeUuid) body.set('commande_uuid', commandeUuid);
+    const res = await fetch(VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': CSRF },
+      body: body.toString(),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      if (resultEl) {
+        resultEl.style.display = 'block';
+        resultEl.className = 'alert alert-error';
+        resultEl.textContent = data.error || 'Vérification impossible.';
+      } else {
+        alert(data.error || 'Vérification impossible.');
+      }
+      return;
+    }
+    if (data.commande_uuid) {
+      document.querySelectorAll(`[data-statut-cmd="${data.commande_uuid}"]`).forEach(el => {
+        el.className = 'badge-statut badge-complete';
+        el.textContent = data.statut_label || 'Complétée';
+      });
+    }
+    if (resultEl) {
+      resultEl.style.display = 'block';
+      resultEl.className = 'alert alert-success';
+      resultEl.textContent = data.message + (data.solde ? ` — Nouveau solde : ${data.solde} crédit(s).` : '');
+    }
+    if (data.success && !data.deja_traite) {
+      setTimeout(() => window.location.reload(), 1500);
+    }
+  } catch (e) {
+    alert('Erreur réseau.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
+  }
+}
+
+function verifierPaiementManuel() {
+  const txId = (document.getElementById('manual-tx-id').value || '').trim();
+  if (!txId) { alert('Saisissez l\'identifiant de transaction Kkiapay.'); return; }
+  appelerVerification(txId, '', document.getElementById('btn-verifier-manuel'));
+}
+
+function verifierCommande(btn) {
+  let txId = (btn.getAttribute('data-transaction-id') || '').trim();
+  const cmdUuid = btn.getAttribute('data-commande-uuid') || '';
+  if (!txId) {
+    txId = (prompt('Collez l\'identifiant de transaction Kkiapay pour cette commande :') || '').trim();
+    if (!txId) return;
+  }
+  appelerVerification(txId, cmdUuid, btn);
+}
 
 function preparerPaiement() {
   const nb = document.getElementById('nb-credits-input').value;

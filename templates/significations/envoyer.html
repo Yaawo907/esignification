@@ -21,13 +21,15 @@
       <a href="{% url 'huissiers:rechercher' %}" class="nav-item spinner-link">⌕ Rechercher</a>
       <a href="{% url 'huissiers:inviter' %}" class="nav-item spinner-link">+ Inviter</a>
       <div class="nav-section" style="margin-top:10px;">Étude</div>
+      {% if not est_clerc %}
       <a href="{% url 'huissiers:liste_clercs' %}" class="nav-item spinner-link">👥 Mes clercs</a>
+      {% endif %}
     </nav>
     <div class="sidebar-user">
       <div class="user-avatar">{{ request.user.email|first|upper }}</div>
       <div>
         <div class="user-name">{{ request.user.email }}</div>
-        <div class="user-role">Huissier</div>
+        <div class="user-role">{% if est_clerc %}Clerc{% else %}Huissier{% endif %}</div>
       </div>
       <a href="{% url 'accounts:deconnexion' %}" class="logout-btn" title="Déconnexion">⏻</a>
     </div>
@@ -206,6 +208,14 @@
             2 · Acte à signifier
           </div>
           <div class="form-group">
+            <label class="form-label" for="titre_acte">Titre de l'acte *</label>
+            <input type="text" name="titre_acte" id="titre_acte" class="form-input"
+              placeholder="Ex. : Assignation en paiement — dossier n° 2024-045"
+              maxlength="300" required minlength="3"
+              value="{{ request.POST.titre_acte|default:'' }}">
+            <p class="form-hint">Intitulé de l'acte tel qu'il apparaîtra dans votre registre et sur la liste des significations.</p>
+          </div>
+          <div class="form-group">
             <label class="form-label" for="fichier_acte">Fichier PDF signé *</label>
             <input type="file" name="fichier_acte" id="fichier_acte" class="form-input"
               accept=".pdf" required onchange="afficherNomFichier(this)">
@@ -269,10 +279,14 @@
             {% if yousign_actif %}4{% else %}3{% endif %} · Signature numérique <span style="color:#e53e3e;">*</span>
           </div>
 
-          {% if params_sig and params_sig.signature_simple_b64 or params_sig and params_sig.signature_cachet_b64 or params_sig and params_sig.cachet_simple_b64 %}
+          {% if signatures_configurees %}
           <!-- Signatures enregistrées -->
           <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
-            Choisissez un tampon enregistré ou dessinez une signature ponctuelle.
+            {% if est_clerc %}
+              Choisissez l'un des tampons configurés par l'étude.
+            {% else %}
+              Choisissez un tampon enregistré ou dessinez une signature ponctuelle.
+            {% endif %}
           </p>
           <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:10px; margin-bottom:14px;">
             {% if params_sig.signature_simple_b64 %}
@@ -299,22 +313,30 @@
               <div style="font-size:11px; font-weight:600; text-align:center;">{{ params_sig.cachet_simple_label }}</div>
             </label>
             {% endif %}
-            <!-- Option : dessiner une signature ponctuelle -->
+            {% if not est_clerc %}
+            <!-- Option : dessiner une signature ponctuelle (huissier uniquement) -->
             <label class="sig-choix" onclick="choisirPad()" id="choix-pad-label">
               <input type="radio" name="_sig_radio" id="choix-pad" style="display:none;">
               <div style="height:52px; display:flex; align-items:center; justify-content:center; font-size:22px; color:#ccc;">✍</div>
               <div style="font-size:11px; font-weight:600; text-align:center; color:var(--text-secondary);">Signer maintenant</div>
             </label>
+            {% endif %}
           </div>
           {% else %}
           <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
-            Aucune signature enregistrée.
-            <a href="{% url 'huissiers:parametres_signatures' %}" style="color:var(--primary);">Configurer mes signatures →</a>
+            {% if est_clerc %}
+              Aucun tampon n'est configuré pour l'étude. Demandez à l'huissier titulaire de configurer les signatures dans
+              <strong>Paramètres → Signatures</strong> avant d'envoyer une signification.
+            {% else %}
+              Aucune signature enregistrée.
+              <a href="{% url 'huissiers:parametres_signatures' %}" style="color:var(--primary);">Configurer mes signatures →</a>
+            {% endif %}
           </p>
           {% endif %}
 
-          <!-- Pad ponctuel (visible si "Signer maintenant" ou aucune signature enregistrée) -->
-          <div id="zone-pad-envoi" style="{% if params_sig and params_sig.signature_simple_b64 or params_sig and params_sig.signature_cachet_b64 or params_sig and params_sig.cachet_simple_b64 %}display:none;{% endif %}">
+          {% if not est_clerc %}
+          <!-- Pad ponctuel (huissier uniquement) -->
+          <div id="zone-pad-envoi" style="{% if signatures_configurees %}display:none;{% endif %}">
             <div style="position:relative; border:2px solid var(--border); border-radius:8px; background:#fafafa; overflow:hidden;">
               <canvas id="sig-canvas" width="620" height="150"
                       style="display:block; width:100%; touch-action:none; cursor:crosshair;"></canvas>
@@ -328,6 +350,7 @@
               <span id="sig-status" style="font-size:12px; color:var(--text-secondary);">Aucune signature</span>
             </div>
           </div>
+          {% endif %}
 
           <input type="hidden" name="signature_b64" id="sig-b64">
           <div id="sig-preview-wrap" style="display:none; margin-top:10px; padding:8px 12px; background:#f0fdf4; border:1px solid #a7d7c0; border-radius:6px; display:none; align-items:center; gap:12px;">
@@ -346,6 +369,7 @@
             </div>
             <div style="font-size:13px; color:#78350f; display:flex; flex-direction:column; gap:4px;">
               <div>✉ <strong id="recap-destinataire">—</strong></div>
+              <div>📌 <span id="recap-titre">Titre non saisi</span></div>
               <div>📄 <span id="recap-fichier">Aucun fichier sélectionné</span></div>
               <div>↩ <span id="recap-reponse">Réponse non requise</span></div>
             </div>
@@ -444,8 +468,10 @@
 <script>
 'use strict';
 
+var estClerc = {% if est_clerc %}true{% else %}false{% endif %};
 var justiciableSelectionne = {% if justiciable %}true{% else %}false{% endif %};
 var fichierSelectionne = false;
+var titreSaisi = false;
 var signatureApposee = false;
 var yousignActif = {% if yousign_actif %}true{% else %}false{% endif %};
 var placementYousignOk = !yousignActif;
@@ -455,7 +481,7 @@ function validerFormulaire() {
   var btn = document.getElementById('btn-envoyer');
   var recap = document.getElementById('recap-envoi');
   if (!btn) return;
-  var ok = justiciableSelectionne && fichierSelectionne && signatureApposee;
+  var ok = justiciableSelectionne && titreSaisi && fichierSelectionne && signatureApposee;
   if (yousignActif) ok = ok && placementYousignOk;
   btn.disabled = !ok;
   btn.style.opacity = ok ? '1' : '.5';
@@ -483,6 +509,7 @@ function choisirSigEnregistree(b64, radioId) {
 
 /* ── Option "Signer maintenant" ────────────────────────────────────────── */
 function choisirPad() {
+  if (estClerc) return;
   document.getElementById('sig-b64').value = '';
   var pad = document.getElementById('zone-pad-envoi');
   if (pad) pad.style.display = 'block';
@@ -662,6 +689,23 @@ function afficherNomFichier(input) {
   cb.addEventListener('change', function() {
     el.textContent = this.checked ? 'Réponse formelle requise' : 'Réponse non requise';
   });
+})();
+
+/* Titre de l'acte */
+(function() {
+  var input = document.getElementById('titre_acte');
+  var recap = document.getElementById('recap-titre');
+  function updateTitre() {
+    if (!input) return;
+    var val = input.value.trim();
+    titreSaisi = val.length >= 3;
+    if (recap) recap.textContent = titreSaisi ? val : 'Titre non saisi';
+    validerFormulaire();
+  }
+  if (input) {
+    input.addEventListener('input', updateTitre);
+    updateTitre();
+  }
 })();
 
 /* Récap destinataire si justiciable pré-chargé depuis l'URL */

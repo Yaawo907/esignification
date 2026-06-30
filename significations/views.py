@@ -20,6 +20,27 @@ def _require_justiciable(user):
     return user.role == User.JUSTICIABLE
 
 
+def _get_huissier_utilisateur(user):
+    if hasattr(user, 'profil_huissier') and user.profil_huissier:
+        return user.profil_huissier
+    return getattr(getattr(user, 'profil_clerc', None), 'huissier', None)
+
+
+def _signatures_autorisees_huissier(huissier):
+    from huissiers.models import ParametreSignatureHuissier
+    try:
+        params = ParametreSignatureHuissier.objects.get(huissier=huissier)
+    except ParametreSignatureHuissier.DoesNotExist:
+        return []
+    return [
+        v.strip() for v in (
+            params.signature_simple_b64,
+            params.signature_cachet_b64,
+            params.cachet_simple_b64,
+        ) if v and v.strip()
+    ]
+
+
 @login_required
 def envoyer_signification(request):
     if not _require_huissier(request.user):
@@ -48,16 +69,26 @@ def envoyer_signification(request):
 
     if request.method == 'POST':
         j_uuid = escape(request.POST.get('justiciable_uuid', ''))
+        titre_acte = escape(request.POST.get('titre_acte', '').strip())
         necessite_reponse = request.POST.get('necessite_reponse') == 'on'
         fichier = request.FILES.get('fichier_acte')
+        from django.contrib import messages
+        redirect_url = f"{request.path}?justiciable={j_uuid}" if j_uuid else request.path
+        if not titre_acte or len(titre_acte) < 3:
+            messages.error(request, "Veuillez saisir le titre de l'acte (minimum 3 caractères).")
+            return redirect(redirect_url)
         if not fichier or not j_uuid:
-            from django.contrib import messages
             messages.error(request, "Veuillez sélectionner un justiciable et joindre l'acte.")
-            return redirect(request.path)
+            return redirect(redirect_url)
         try:
             justiciable = ProfilJusticiable.objects.get(uuid=j_uuid)
         except ProfilJusticiable.DoesNotExist:
             raise Http404
+
+        from accounts.models import User as UserModel
+        huissier = _get_huissier_utilisateur(request.user)
+        est_clerc = request.user.role == UserModel.CLERC
+
         # Récupérer et valider la signature visuelle (tout format image base64)
         signature_b64 = request.POST.get('signature_b64', '').strip()
         prefixes_valides = (
@@ -66,15 +97,28 @@ def envoyer_signification(request):
             'data:image/webp;base64,', 'data:image/gif;base64,',
         )
         if not signature_b64 or not any(signature_b64.startswith(p) for p in prefixes_valides):
-            from django.contrib import messages
             messages.error(request, "Veuillez apposer votre signature avant d'envoyer l'acte.")
-            return redirect(request.path)
+            return redirect(redirect_url)
+
+        if est_clerc:
+            autorisees = _signatures_autorisees_huissier(huissier)
+            if not autorisees:
+                messages.error(
+                    request,
+                    "Aucun tampon n'est configuré pour l'étude. Contactez l'huissier titulaire.",
+                )
+                return redirect(redirect_url)
+            if signature_b64 not in autorisees:
+                messages.error(
+                    request,
+                    "En tant que clerc, vous devez choisir un tampon configuré par l'étude.",
+                )
+                return redirect(redirect_url)
 
         # Lire et chiffrer le fichier
         contenu = fichier.read()
         hash_acte = hash_fichier(contenu)
         contenu_chiffre = chiffrer_fichier(contenu)
-        huissier = request.user.profil_huissier if hasattr(request.user, 'profil_huissier') else request.user.profil_clerc.huissier
 
         from paiements.services.credits import verifier_solde_envoi, debiter_envoi_signification, CreditInsuffisant
         try:
@@ -121,6 +165,7 @@ def envoyer_signification(request):
             justiciable=justiciable,
             fichier_chiffre=contenu_chiffre,
             nom_fichier_original=escape(fichier.name),
+            titre_acte=titre_acte,
             taille_fichier=len(contenu),
             necessite_reponse=necessite_reponse,
             hash_acte=hash_acte,
@@ -171,9 +216,10 @@ def envoyer_signification(request):
             sauvegarder_dimensions_profil_huissier(huissier, placement_yousign)
         return redirect('huissiers:tableau_de_bord')
     # Charger les signatures enregistrées de l'huissier
+    from accounts.models import User as UserModel
     from huissiers.models import ParametreSignatureHuissier
-    huissier = (request.user.profil_huissier if hasattr(request.user, 'profil_huissier') and request.user.profil_huissier
-                else getattr(getattr(request.user, 'profil_clerc', None), 'huissier', None))
+    huissier = _get_huissier_utilisateur(request.user)
+    est_clerc = request.user.role == UserModel.CLERC
     params_sig = None
     if huissier:
         params_sig, _ = ParametreSignatureHuissier.objects.get_or_create(huissier=huissier)
@@ -181,11 +227,14 @@ def envoyer_signification(request):
     from administration.models import ConfigurationPlateforme
     config = ConfigurationPlateforme.get()
     solde_credits = get_solde(huissier) if huissier else None
+    signatures_configurees = bool(_signatures_autorisees_huissier(huissier)) if huissier else False
     return render(request, 'significations/envoyer.html', {
         'justiciable': justiciable,
         'q': q,
         'resultats_recherche': resultats_recherche,
         'params_sig': params_sig,
+        'est_clerc': est_clerc,
+        'signatures_configurees': signatures_configurees,
         'solde_credits': solde_credits,
         'credit_debit_envoi': credit_debit_envoi(),
         'credit_retour_refus': credit_debit_envoi() - cout_net_apres_refus(),
@@ -473,6 +522,37 @@ def _generer_pdf_certificat(signification, certificat):
     c.showPage()
     c.save()
     return buffer.getvalue()
+
+
+@login_required
+def detail_signification(request, uuid):
+    """Fiche détail imprimable d'une signification — huissier / clerc."""
+    sig = get_object_or_404(
+        Signification.objects.select_related(
+            'huissier', 'justiciable', 'expediteur', 'certificat',
+        ).prefetch_related('relances'),
+        uuid=uuid,
+    )
+    user = request.user
+    from accounts.models import User as U
+    if user.role not in [U.HUISSIER, U.CLERC]:
+        raise Http404
+    h = user.profil_huissier if user.role == U.HUISSIER else user.profil_clerc.huissier
+    if sig.huissier != h:
+        raise Http404
+    date_edition = timezone.localtime(timezone.now())
+    journaliser(
+        request.user, 'signification_detail_consulte', 'Signification',
+        sig.uuid, description=f"Détail — {sig.reference}", request=request,
+    )
+    reponse = None
+    if hasattr(sig, 'reponse'):
+        reponse = sig.reponse
+    return render(request, 'significations/detail_signification.html', {
+        'sig': sig,
+        'reponse': reponse,
+        'date_edition': date_edition,
+    })
 
 
 @login_required

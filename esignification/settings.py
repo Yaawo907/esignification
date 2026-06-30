@@ -205,6 +205,9 @@ CERTIGNA_LOGIN = env('CERTIGNA_LOGIN', default='')
 CERTIGNA_PASSWORD = env('CERTIGNA_PASSWORD', default='')
 
 SITE_URL = env('SITE_URL', default='http://localhost:8000')
+# URL de base pour le callback Kkiapay (Render : https://esignification.onrender.com)
+# Le chemin /paiements/callback/kkiapay/ est ajouté automatiquement si absent.
+KKIAPAY_CALLBACK_URL = env('KKIAPAY_CALLBACK_URL', default='')
 ACTIVATION_TOKEN_EXPIRY_HOURS = env.int('ACTIVATION_TOKEN_EXPIRY_HOURS', default=72)
 
 # Sécurité

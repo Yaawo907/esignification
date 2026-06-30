@@ -1,0 +1,204 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Détail signification — {{ sig.reference }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; background: #eef1f6; line-height: 1.45; }
+  .toolbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; gap: 10px; align-items: center; justify-content: center;
+    padding: 12px 16px; background: #fff; border-bottom: 1px solid #dde2ea;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px; border-radius: 6px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none;
+  }
+  .btn-primary { background: #1a3c6e; color: #fff; }
+  .btn-ghost { background: #f0f2f7; color: #333; border: 1px solid #dde2ea; }
+  .page {
+    max-width: 210mm; margin: 24px auto; background: #fff;
+    border: 1px solid #dde2ea; box-shadow: 0 4px 24px rgba(0,0,0,.08);
+    padding: 18mm 16mm;
+  }
+  .header {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;
+    padding-bottom: 14px; border-bottom: 2px solid #1a3c6e; margin-bottom: 22px;
+  }
+  .platform { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #5a6478; margin-bottom: 4px; }
+  .title { font-size: 20px; font-weight: 700; color: #1a3c6e; margin-bottom: 6px; }
+  .subtitle { font-size: 12px; color: #5a6478; }
+  .header-right { text-align: right; font-size: 11px; color: #5a6478; min-width: 160px; }
+  .header-right strong { color: #1a1a1a; display: block; font-size: 12px; margin-bottom: 2px; }
+  .acte-titre {
+    background: #f5f8ff; border: 1px solid #d0dff5; border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 20px;
+  }
+  .acte-titre-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #5a6478; margin-bottom: 4px; }
+  .acte-titre-value { font-size: 16px; font-weight: 700; color: #1a3c6e; line-height: 1.35; }
+  .section { margin-bottom: 18px; }
+  .section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    color: #1a3c6e; border-bottom: 1px solid #dde2ea; padding-bottom: 5px; margin-bottom: 10px;
+  }
+  .grid { display: grid; grid-template-columns: 150px 1fr; gap: 7px 14px; font-size: 13px; }
+  .label { color: #5a6478; font-weight: 600; }
+  .value { color: #1a1a1a; }
+  .value.mono { font-family: Consolas, monospace; font-size: 12px; word-break: break-all; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; background: #e8f0f8; color: #1a3c6e; border: 1px solid #a8c0d5;
+  }
+  .footer {
+    margin-top: 24px; padding-top: 14px; border-top: 1px solid #dde2ea;
+    font-size: 10px; color: #7a8494; text-align: center;
+  }
+  @media print {
+    body { background: #fff; }
+    .toolbar { display: none !important; }
+    .page { margin: 0; border: none; box-shadow: none; max-width: none; padding: 12mm 10mm; }
+    @page { size: A4; margin: 10mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button type="button" class="btn btn-primary" onclick="window.print()">🖨 Imprimer</button>
+  <button type="button" class="btn btn-ghost" onclick="window.close()">Fermer</button>
+</div>
+
+<div class="page">
+  <header class="header">
+    <div>
+      <div class="platform">{{ config.nom_plateforme|default:"e-Signification Bénin" }}</div>
+      <h1 class="title">Fiche de signification électronique</h1>
+      <p class="subtitle">Document de référence — usage interne et production devant juridiction</p>
+    </div>
+    <div class="header-right">
+      <strong>Me {{ sig.huissier.prenom }} {{ sig.huissier.nom }}</strong>
+      {{ sig.huissier.nom_etude }}
+      <br><br>
+      Édité le {{ date_edition|date:"d/m/Y" }} à {{ date_edition|date:"H:i" }}
+    </div>
+  </header>
+
+  <div class="acte-titre">
+    <div class="acte-titre-label">Titre de l'acte</div>
+    <div class="acte-titre-value">{{ sig.titre_acte|default:"—" }}</div>
+  </div>
+
+  <section class="section">
+    <h2 class="section-title">Identification</h2>
+    <div class="grid">
+      <div class="label">Référence</div>
+      <div class="value mono"><strong>{{ sig.reference }}</strong></div>
+      <div class="label">Statut</div>
+      <div class="value"><span class="badge">{{ sig.get_statut_display }}</span></div>
+      <div class="label">Date d'envoi</div>
+      <div class="value">{{ sig.date_envoi|date:"d/m/Y à H:i:s" }}</div>
+      {% if sig.date_acceptation %}
+      <div class="label">Date d'acceptation</div>
+      <div class="value">{{ sig.date_acceptation|date:"d/m/Y à H:i:s" }}</div>
+      {% endif %}
+      {% if sig.date_refus %}
+      <div class="label">Date de refus</div>
+      <div class="value">{{ sig.date_refus|date:"d/m/Y à H:i:s" }}</div>
+      {% endif %}
+      <div class="label">Réponse requise</div>
+      <div class="value">{% if sig.necessite_reponse %}Oui{% else %}Non{% endif %}</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Justiciable destinataire</h2>
+    <div class="grid">
+      <div class="label">Nom</div>
+      <div class="value"><strong>{{ sig.justiciable.nom_complet }}</strong></div>
+      <div class="label">Email domicile</div>
+      <div class="value">{{ sig.justiciable.email_domicile }}</div>
+      {% if sig.justiciable.npi %}
+      <div class="label">NPI</div>
+      <div class="value mono">{{ sig.justiciable.npi }}</div>
+      {% endif %}
+      {% if sig.justiciable.ifu %}
+      <div class="label">IFU</div>
+      <div class="value mono">{{ sig.justiciable.ifu }}</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">Acte transmis</h2>
+    <div class="grid">
+      <div class="label">Fichier</div>
+      <div class="value">{{ sig.nom_fichier_original|default:"—" }}</div>
+      <div class="label">Taille</div>
+      <div class="value">{% if sig.taille_fichier %}{{ sig.taille_fichier|filesizeformat }}{% else %}—{% endif %}</div>
+      {% if sig.hash_acte %}
+      <div class="label">Empreinte acte</div>
+      <div class="value mono">{{ sig.hash_acte }}</div>
+      {% endif %}
+      {% if sig.yousign_statut %}
+      <div class="label">Signature Yousign</div>
+      <div class="value">{{ sig.yousign_statut|upper }}</div>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if sig.certificat %}
+  <section class="section">
+    <h2 class="section-title">Certificat de réception</h2>
+    <div class="grid">
+      <div class="label">Date réception</div>
+      <div class="value">{{ sig.certificat.date_reception|date:"d/m/Y à H:i:s" }}</div>
+      {% if sig.certificat.hash_certificat %}
+      <div class="label">Hash certificat</div>
+      <div class="value mono">{{ sig.certificat.hash_certificat }}</div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if reponse %}
+  <section class="section">
+    <h2 class="section-title">Réponse du justiciable</h2>
+    <div class="grid">
+      <div class="label">Date d'envoi</div>
+      <div class="value">{{ reponse.date_envoi_justiciable|date:"d/m/Y à H:i:s" }}</div>
+      {% if reponse.hash_reponse %}
+      <div class="label">Hash réponse</div>
+      <div class="value mono">{{ reponse.hash_reponse }}</div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if sig.relances.all %}
+  <section class="section">
+    <h2 class="section-title">Relances</h2>
+    <div class="grid">
+      {% for rel in sig.relances.all %}
+      <div class="label">Relance {{ rel.numero_relance }}</div>
+      <div class="value">{{ rel.date_envoi|date:"d/m/Y à H:i" }}</div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <footer class="footer">
+    <p>Document établi par <strong>{{ sig.huissier.nom_etude }}</strong> via {{ config.nom_plateforme|default:"e-Signification Bénin" }}.</p>
+    <p>Référence plateforme : {{ sig.uuid }}</p>
+    {% if config.article_loi_signification %}
+    <p style="margin-top:6px;">Base légale : {{ config.article_loi_signification }}</p>
+    {% endif %}
+  </footer>
+</div>
+
+</body>
+</html>

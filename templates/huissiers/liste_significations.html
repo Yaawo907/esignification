@@ -76,6 +76,7 @@
             <thead>
               <tr>
                 <th>Référence</th>
+                <th>Titre de l'acte</th>
                 <th>Justiciable</th>
                 <th>Date envoi</th>
                 <th>Statut</th>
@@ -85,10 +86,19 @@
             </thead>
             <tbody id="tbody-sig">
               {% for sig in significations %}
-              <tr data-search="{{ sig.reference|lower }} {{ sig.justiciable.nom_complet|lower }} {{ sig.justiciable.email_domicile|lower }}">
+              <tr data-search="{{ sig.reference|lower }} {{ sig.titre_acte|lower }} {{ sig.justiciable.nom_complet|lower }} {{ sig.justiciable.email_domicile|lower }}">
                 <td>
                   <div class="td-name" style="font-family:monospace; font-size:12px; letter-spacing:.02em;">{{ sig.reference }}</div>
-                  <div class="td-sub">{{ sig.date_envoi|date:"d/m/Y H:i" }}</div>
+                </td>
+                <td>
+                  <div class="td-name" style="font-size:13px; max-width:220px;">
+                    {{ sig.titre_acte|default:"—" }}
+                  </div>
+                  {% if sig.nom_fichier_original %}
+                  <div class="td-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px;">
+                    {{ sig.nom_fichier_original }}
+                  </div>
+                  {% endif %}
                 </td>
                 <td>
                   <div class="td-name">{{ sig.justiciable.nom_complet }}</div>
@@ -130,7 +140,14 @@
                   {% endif %}
                 </td>
                 <td style="text-align:right;">
-                  <div style="display:flex; gap:6px; justify-content:flex-end;">
+                  <div style="display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">
+
+                    <a href="{% url 'significations:detail' sig.uuid %}"
+                      target="_blank" rel="noopener"
+                      class="btn btn-xs btn-ghost"
+                      title="Fiche détail imprimable">
+                      ℹ Détail
+                    </a>
 
                     {% if sig.fichier_chiffre %}
                     <a href="{% url 'significations:telecharger_acte' sig.uuid %}"
@@ -206,7 +223,7 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="6" class="td-empty">
+                <td colspan="7" class="td-empty">
                   {% if statut_filtre %}
                     Aucune signification avec le statut « {{ statut_filtre }} ».
                     <a href="?" style="margin-left:8px;">Voir toutes →</a>

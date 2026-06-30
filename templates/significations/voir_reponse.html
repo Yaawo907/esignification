@@ -36,11 +36,11 @@
           </div>
           <div>
             <div style="font-size:11px; color:var(--text-light);">Date d'envoi</div>
-            <div style="font-size:13px;">{{ sig.date_envoi|date:"d/m/Y H:i" }}</div>
+            <div style="font-size:13px;">{{ sig.date_envoi|date:"d/m/Y H:i:s" }}</div>
           </div>
           <div>
             <div style="font-size:11px; color:var(--text-light);">Date d'acceptation</div>
-            <div style="font-size:13px;">{{ sig.date_acceptation|date:"d/m/Y H:i"|default:"—" }}</div>
+            <div style="font-size:13px;">{{ sig.date_acceptation|date:"d/m/Y H:i:s"|default:"—" }}</div>
           </div>
         </div>
       </div>
@@ -53,13 +53,13 @@
         <div class="grid-2" style="gap:10px 24px; margin-bottom:20px;">
           <div>
             <div style="font-size:11px; color:var(--text-light);">Date d'envoi de la réponse</div>
-            <div style="font-size:13px;">{{ reponse.date_envoi_justiciable|date:"d/m/Y H:i" }}</div>
+            <div style="font-size:13px;">{{ reponse.date_envoi_justiciable|date:"d/m/Y H:i:s" }}</div>
           </div>
           <div>
             <div style="font-size:11px; color:var(--text-light);">Réception par l'étude</div>
             <div style="font-size:13px;">
               {% if reponse.date_reception_huissier %}
-                {{ reponse.date_reception_huissier|date:"d/m/Y H:i" }}
+                {{ reponse.date_reception_huissier|date:"d/m/Y H:i:s" }}
               {% else %}
                 Maintenant
               {% endif %}
